@@ -41,7 +41,8 @@ app.post('/api/create-pix', async (req, res) => {
     if (!pack) return res.status(400).json({ error: 'Pacote inválido' });
 
     // Cria a ordem Pix no Mercado Pago
-    const result = await pix.createPayment(pack);
+    const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+    const result = await pix.createPayment(pack, baseUrl);
     const paymentId = String(result.id);
 
     // Guarda o pagamento pendente

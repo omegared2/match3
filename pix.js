@@ -9,11 +9,15 @@ const API = 'https://api.mercadopago.com';
 /**
  * Cria um pagamento Pix no Mercado Pago.
  * Retorna os dados da transação + QR Code.
+ * @param {object} pack Pacote vendido
+ * @param {string} baseUrl URL pública (para o webhook de notificação)
  */
-async function createPayment(pack) {
+async function createPayment(pack, baseUrl) {
   if (!ACCESS_TOKEN) {
-    throw new Error('MP_ACCESS_TOKEN não configurado no arquivo .env');
+    throw new Error('MP_ACCESS_TOKEN não configurado');
   }
+
+  const webhookUrl = `${baseUrl}/api/webhook/mp`;
 
   const body = {
     transaction_amount: pack.brl,
@@ -22,7 +26,7 @@ async function createPayment(pack) {
     payer: {
       email: 'comprador@exemplo.com.br' // ideal: email do jogador
     },
-    notification_url: `${BASE_URL}/api/webhook/mp`
+    notification_url: webhookUrl
   };
 
   const res = await axios.post(`${API}/v1/payments`, body, {
