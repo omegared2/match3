@@ -44,8 +44,9 @@ app.use(express.static(GAME_DIR));
 // Cash Royale (battle royale) também é servido por este mesmo serviço
 app.use('/royale', express.static(path.join(__dirname, 'cash-royale', 'public')));
 
-// Batalha do Cavaleiro
-app.get('/batalha', (req, res) => res.sendFile(path.join(__dirname, 'public', 'batalha.html')));
+// Batalha do Cavaleiro (mundo aberto)
+app.get('/batalha', (req, res) => res.sendFile(path.join(__dirname, 'public', 'aventura.html')));
+app.get('/aventura', (req, res) => res.sendFile(path.join(__dirname, 'public', 'aventura.html')));
 
 // -------------------------------------------------------
 // PACKS: pacotes de moedas vendidos via Pix
@@ -241,14 +242,70 @@ app.post('/api/arena/leave', async (req, res) => {
 });
 
 // -------------------------------------------------------
-// 9) BATALHA DO CAVALEIRO (RPG)
+// 9) MUNDO DO CAVALEIRO (RPG com mapa, NPCs e classes)
 // -------------------------------------------------------
 app.get('/api/char/:userId', async (req, res) => {
   try {
     const p = await rpg.profile(db, req.params.userId);
-    res.json({ ...p, kit: rpg.kit(), coins: (await db.dbGetUser(req.params.userId)).balance, entryCost: rpg.entryCost(p.level) });
+    const [coins, world] = await Promise.all([
+      db.dbGetUser(req.params.userId).then(u => u.balance),
+      rpg.worldState(db, req.params.userId)
+    ]);
+    res.json({ ...p, coins, entryCost: rpg.entryCost(p.phase), world });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao carregar personagem' });
+  }
+});
+
+app.post('/api/move', async (req, res) => {
+  try {
+    const { userId, dx, dy } = req.body;
+    if (!userId || dx === undefined || dy === undefined) return res.status(400).json({ error: 'userId, dx e dy obrigatórios' });
+    const r = await rpg.move(db, userId, Math.sign(+dx), Math.sign(+dy));
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    console.error('Erro ao mover:', err.message);
+    res.status(500).json({ error: 'Erro ao mover' });
+  }
+});
+
+app.post('/api/interact', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
+    const r = await rpg.interact(db, userId);
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    console.error('Erro ao interagir:', err.message);
+    res.status(500).json({ error: 'Erro ao interagir' });
+  }
+});
+
+app.post('/api/shop/buy', async (req, res) => {
+  try {
+    const { userId, type, arg } = req.body;
+    if (!userId || !type || !arg) return res.status(400).json({ error: 'userId, type e arg obrigatórios' });
+    const r = await rpg.buyShop(db, userId, type, arg);
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    console.error('Erro na loja:', err.message);
+    res.status(500).json({ error: 'Erro na loja' });
+  }
+});
+
+app.post('/api/potion', async (req, res) => {
+  try {
+    const { userId, which } = req.body;
+    if (!userId || !which) return res.status(400).json({ error: 'userId e which obrigatórios' });
+    const r = await rpg.potionOut(db, userId, which);
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    console.error('Erro ao usar poção:', err.message);
+    res.status(500).json({ error: 'Erro ao usar poção' });
   }
 });
 
@@ -256,7 +313,7 @@ app.post('/api/battle/start', async (req, res) => {
   try {
     const { userId } = req.body;
     if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
-    const r = await rpg.startBattle(db, userId);
+    const r = await rpg.startBossAt(db, userId);
     if (r.error) return res.status(400).json({ error: r.error });
     res.json(r);
   } catch (err) {
@@ -271,25 +328,12 @@ app.post('/api/battle/action', async (req, res) => {
     if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
     const r = await rpg.act(db, userId, action || 'attack');
     if (r.error) return res.status(400).json({ error: r.error });
-    if (r.win === true) notifyTelegram(`🏆 BATALHA DO CAVALEIRO: usuário ${userId} venceu a Fase ${r.battle.level}! +${r.battle.reward} moedas (pote do cavaleiro).`);
-    if (r.win === false) notifyTelegram(`💀 BATALHA DO CAVALEIRO: usuário ${userId} caiu na Fase ${r.battle.level} (a entrada ficou com o inimigo).`);
+    if (r.win === true) notifyTelegram(`🏆 BATALHA DO CAVALEIRO: usuário ${userId} venceu o chefe ${r.battle.type === 'boss' ? `da Fase ${r.battle.level}` : 'monstro'}! (+${r.battle.reward} moedas)`);
+    if (r.win === false) notifyTelegram(`💀 BATALHA DO CAVALEIRO: usuário ${userId} caiu (${r.battle.level ? 'Fase ' + r.battle.level : 'monstro'}).`);
     res.json(r);
   } catch (err) {
     console.error('Erro na batalha:', err.message);
     res.status(500).json({ error: 'Erro na batalha' });
-  }
-});
-
-app.post('/api/gear/buy', async (req, res) => {
-  try {
-    const { userId, slot, idx } = req.body;
-    if (!userId || !slot || idx === undefined) return res.status(400).json({ error: 'userId, slot e idx obrigatórios' });
-    const r = await rpg.buyGear(db, userId, slot, +idx);
-    if (r.error) return res.status(400).json({ error: r.error });
-    res.json(r);
-  } catch (err) {
-    console.error('Erro ao comprar equipamento:', err.message);
-    res.status(500).json({ error: 'Erro ao comprar equipamento' });
   }
 });
 

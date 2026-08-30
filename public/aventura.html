@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>⚔️ Aventura do Cavaleiro</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;overflow:hidden;font-family:'Trebuchet MS',Arial,sans-serif;background:#0c1310;color:#fff;user-select:none;-webkit-user-select:none;}
+  #wrap{display:flex;flex-direction:column;height:100%;}
+  #hud{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 8px;background:linear-gradient(180deg,#16221b,#0c1310);flex-wrap:wrap;z-index:5;}
+  .pill{background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.14);padding:3px 9px;border-radius:14px;font-size:13px;font-weight:bold;white-space:nowrap;}
+  .pill b{color:#ffd700;}
+  .hpbar{height:13px;background:#3c1515;border:1px solid rgba(255,255,255,.25);border-radius:8px;overflow:hidden;flex:1;min-width:70px;}
+  .hpfill{height:100%;background:linear-gradient(90deg,#c0392b,#ff6f61);transition:width .3s;}
+  #worldMount{position:relative;flex:1;min-height:0;}
+  #cv{position:absolute;inset:0;width:100%;height:100%;display:block;image-rendering:auto;background:#3f7d32;}
+  #msg{position:absolute;top:6px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.7);border:1px solid rgba(255,255,255,.2);padding:5px 14px;border-radius:14px;font-size:13px;max-width:92%;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:6;display:none;}
+  #hint{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.5);padding:3px 12px;border-radius:12px;font-size:12px;color:#ddd;z-index:6;pointer-events:none;}
+  #potions{display:flex;gap:5px;}
+  .potbtn{background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.16);border-radius:10px;padding:3px 7px;font-size:13px;cursor:pointer;font-weight:bold;}
+  .potbtn.off{opacity:.35;pointer-events:none;}
+
+  #controls{display:flex;position:absolute;inset:0;pointer-events:none;z-index:7;}
+  #dpad{position:absolute;right:16px;bottom:34px;display:grid;grid-template-columns:repeat(3,56px);grid-template-rows:repeat(3,56px);gap:4px;pointer-events:auto;}
+  .dp{background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.25);border-radius:14px;font-size:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+  .dp:active{background:rgba(255,215,0,.4);}
+  #interactBtn{position:absolute;left:16px;bottom:34px;pointer-events:auto;background:linear-gradient(135deg,#ffd700,#ff8c00);color:#221;border:none;border-radius:16px;padding:14px 18px;font-size:16px;font-weight:bold;box-shadow:0 6px 16px rgba(0,0,0,.4);cursor:pointer;}
+  #interactBtn:active{transform:scale(.94);}
+  #shopBtn{position:absolute;left:16px;bottom:96px;pointer-events:auto;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:12px;padding:10px 14px;font-size:14px;cursor:pointer;}
+
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.9);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:60;padding:14px;text-align:center;}
+  .card{width:min(420px,94vw);background:#1b2430;border:1px solid rgba(255,255,255,.18);border-radius:18px;padding:16px;max-height:86vh;overflow-y:auto;}
+  .btitle{font-size:18px;font-weight:bold;margin-bottom:12px;color:#ffd700;letter-spacing:1px;}
+  .ii{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:9px;margin-bottom:8px;text-align:left;}
+  .ii .ic{font-size:28px;}
+  .ii .inf{flex:1;}
+  .ii .nm{font-weight:bold;font-size:14px;}
+  .ii .ds{font-size:12px;color:#cfe;opacity:.85;}
+  .ii button{background:linear-gradient(135deg,#2ecc71,#1e8e5a);border:none;border-radius:9px;padding:8px 11px;color:#fff;font-weight:bold;font-size:13px;cursor:pointer;}
+  .ii button.locked{background:#555;opacity:.5;cursor:default;}
+  .ii.owned{border-color:#7dff7d;}
+  .btn{border:none;border-radius:12px;padding:11px 15px;font-weight:bold;font-size:14px;cursor:pointer;margin:4px;}
+  .btny{background:linear-gradient(135deg,#ffd700,#ff8c00);color:#221;}
+  .btnb{background:linear-gradient(135deg,#39c0ff,#1e5faa);color:#fff;}
+  .btng{background:linear-gradient(135deg,#2ecc71,#1e8e5a);color:#fff;}
+  .btnz{background:#555;color:#fff;}
+
+  .modal{background:#fff;color:#222;border-radius:18px;padding:22px;max-width:340px;width:92vw;text-align:center;}
+  .modal img{width:180px;height:180px;border:1px solid #ddd;border-radius:8px;margin:0 auto 12px;display:block;}
+  .modal textarea{width:100%;height:74px;font-size:11px;border:1px solid #ccc;border-radius:8px;padding:6px;box-sizing:border-box;}
+  .modal .mrow{display:flex;gap:8px;}
+  .modal button{flex:1;padding:12px;border:none;border-radius:9px;color:#fff;font-weight:bold;cursor:pointer;}
+  .modal button.blue{background:#3483fa;}
+  .modal button.green{background:#2ecc71;}
+  .modal .gray{background:#eee;color:#333;width:100%;margin-top:8px;}
+  .packrow{display:flex;gap:8px;justify-content:center;margin-bottom:10px;flex-wrap:wrap;}
+
+  .battleCard{width:min(430px,94vw);}
+  .bf{display:flex;gap:10px;justify-content:center;margin-bottom:10px;}
+  .bfig{flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:10px;}
+  .bfig.hit{animation:hit .25s;}
+  @keyframes hit{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}50%{transform:translateX(8px)}}
+  .bwho{font-size:13px;font-weight:bold;display:flex;justify-content:space-between;}
+  .bemo{font-size:42px;text-align:center;}
+  .bhpb{height:14px;background:#331;border:1px solid rgba(255,255,255,.3);border-radius:8px;overflow:hidden;margin-top:5px;}
+  .bhpf{height:100%;width:100%;background:linear-gradient(90deg,#c0392b,#ff8a5c);transition:width .32s;}
+  .bhpf.enemy{background:linear-gradient(90deg,#8e44ad,#c39bd3);}
+  .blog{max-height:120px;overflow-y:auto;text-align:left;font-size:12.5px;line-height:1.5;margin-bottom:10px;}
+  .blog div{padding:1px 0;border-bottom:1px dashed rgba(255,255,255,.07);white-space:pre-wrap;}
+  .bact{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
+  .bact .btn{font-size:16px;padding:12px 16px;}
+  .bigE{font-size:74px;animation:bounce 1s infinite;}
+  @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+  .confetti{position:absolute;width:9px;height:13px;border-radius:2px;animation:cf 3s linear infinite;}
+  @keyframes cf{0%{transform:translateY(-20px) rotate(0);opacity:1}100%{transform:translateY(110vh) rotate(720deg);opacity:0}}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud">
+    <span class="pill" id="hCoins">💰 <b>0</b></span>
+    <span class="pill" id="hFase">FASE <b>1</b></span>
+    <span class="pill" id="hClass">🛡️ Cavaleiro Novato</span>
+    <span class="pill" id="hLvl">⭐ <b>1</b></span>
+    <div class="hpbar"><div class="hpfill" id="hpHp" style="width:100%"></div></div>
+    <div id="potions">
+      <button class="potbtn" id="pHeal" onclick="usePotionNow('heal')">🧪 <span id="pHc">0</span></button>
+      <button class="potbtn off" id="pBuff">🔥 <span id="pBc">0</span></button>
+    </div>
+  </div>
+
+  <div id="worldMount">
+    <canvas id="cv"></canvas>
+    <div id="msg"></div>
+    <div id="hint">🕹️ Teclas WASD/⭡⭣ — <b>E</b> conversar · <b>P</b> poção</div>
+    <div id="controls">
+      <button id="shopBtn" style="display:none;" onclick="openCharSheet()">👤 Personagem</button>
+      <button id="interactBtn" onclick="doInteract()">💬 Falar</button>
+      <div id="dpad">
+        <div></div><div class="dp" onclick="mv(0,-1)">⬆️</div><div></div>
+        <div class="dp" onclick="mv(-1,0)">⬅️</div><div class="dp" onclick="nothing()">✋</div><div class="dp" onclick="mv(1,0)">➡️</div>
+        <div></div><div class="dp" onclick="mv(0,1)">⬇️</div><div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SHEET (personagem) -->
+<div class="overlay" id="sheOverlay">
+  <div class="card">
+    <div class="btitle">👤 SEU PERSONAGEM</div>
+    <div id="sheetBody"></div>
+    <button class="btn btny" onclick="closeOv('sheOverlay');loadChar();">Voltar ao mundo</button>
+    <button class="btn btnz" style="width:100%;margin-top:4px;" onclick="openStore()">💳 Comprar moedas (Pix)</button>
+  </div>
+</div>
+
+<!-- LOJA -->
+<div class="overlay" id="shopOverlay">
+  <div class="card" id="shopCard"></div>
+</div>
+
+<!-- CONFIRMAÇÃO CHEFE -->
+<div class="overlay" id="bossOverlay">
+  <div class="card">
+    <div class="bigE">☠️</div>
+    <div style="font-size:18px;font-weight:bold;" id="bossName"></div>
+    <p style="margin:8px 0 4px;">Desafiar o chefe custa <b id="bossFee"></b> moedas.<br>Vencendo, você ganha o dobro + XP e libera a próxima fase!</p>
+    <button class="btn btny" onclick="fightBoss()">⚔️ Lutar pela entrada</button>
+    <button class="btn btnz" onclick="closeOv('bossOverlay')">Agora não</button>
+  </div>
+</div>
+
+<!-- BATALHA -->
+<div class="overlay" id="battleOverlay">
+  <div class="card battleCard">
+    <div class="bf">
+      <div class="bfig" id="pF">
+        <div class="bwho"><span>VOCÊ</span><span>⭐ <span id="bLvl">1</span></span></div>
+        <div class="bemo">🛡️</div>
+        <div class="bhpb"><div class="bhpf" id="bphp"></div></div>
+        <div style="font-size:11px;margin-top:2px;">❤️ <span id="bphpT">0/0</span></div>
+      </div>
+      <div class="bfig" id="eF">
+        <div class="bwho"><span id="beName">Inimigo</span><span id="beType"></span></div>
+        <div class="bemo">👾</div>
+        <div class="bhpb"><div class="bhpf enemy" id="behp"></div></div>
+        <div style="font-size:11px;margin-top:2px;">❤️ <span id="behpT">0/0</span></div>
+      </div>
+    </div>
+    <div class="blog" id="blog"></div>
+    <div class="bact">
+      <button class="btn btny" onclick="bAction('attack')">🗡️ Atacar</button>
+      <button class="btn btnb" onclick="bAction('defender')">🛡️ Defender</button>
+      <button class="btn btng" onclick="bPotionMenu()">🧪 Poção (${counts()})</button>
+    </div>
+  </div>
+</div>
+
+<!-- VITÓRIA / DERROTA -->
+<div class="overlay" id="winOv">
+  <div class="card" style="text-align:center;">
+    <div class="bigE">🏆</div>
+    <div style="font-size:22px;font-weight:bold;">VITÓRIA!</div>
+    <p id="winTxt" style="font-size:15px;margin:8px 0;"></p>
+    <button class="btn btny" onclick="winClose()">Continuar o mundo</button>
+  </div>
+</div>
+<div class="overlay" id="loseOv">
+  <div class="card" style="text-align:center;">
+    <div class="bigE">💀</div>
+    <div style="font-size:22px;font-weight:bold;margin-bottom:8px;">VOCÊ CAIU</div>
+    <p style="font-size:14px;" id="loseTxt"></p>
+    <button class="btn btny" onclick="winClose()">Voltar</button>
+  </div>
+</div>
+
+<!-- PIX -->
+<div class="overlay" id="pixOv">
+  <div class="modal">
+    <div class="packrow" id="pixPacks"></div>
+    <p id="pixInfo" style="font-size:14px;margin:0 0 8px;"></p>
+    <img id="pixImg" src="" alt="QR"/>
+    <p style="font-size:13px;margin:0 0 6px;">ou copie o código:</p>
+    <textarea id="pixCode" readonly></textarea>
+    <div class="mrow">
+      <button class="blue" onclick="copyPix()">Copiar</button>
+      <button class="green" onclick="checkPix()">Já paguei</button>
+    </div>
+    <button class="gray" onclick="closeStore()">Fechar</button>
+    <p id="pixStatus" style="margin:8px 0 0;font-size:13px;color:#333;"></p>
+  </div>
+</div>
+
+<script>
+const API='';
+const TILE=40;
+let userId=localStorage.getItem('match3_user')||('r_'+Math.random().toString(36).slice(2,10));
+localStorage.setItem('match3_user',userId);
+
+let S=null;                 // perfil + mundo
+let coins=0;
+let busy=false;
+let inBattle=false;
+let battle=null;
+let packs=[]; let pixTimer=null;
+let soundOn=true;
+
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+let cw,ch, camX=0, camY=0, lastNow=performance.now();
+
+// ---------- CARREGAR ----------
+function loadChar(after){
+  return fetch(API+'/api/char/'+userId).then(r=>r.json()).then(p=>{
+    S=p; coins=p.coins; renderHud(); if(after)after(); draw(); return p;
+  }).catch(()=>{flash('Falha de conexão.');});
+}
+function renderHud(){
+  document.getElementById('hCoins').innerHTML='💰 <b>'+coins+'</b>';
+  document.getElementById('hFase').innerHTML='FASE <b>'+S.phase+'</b>'+(S.phase>=S.maxPhase?' 👑':'');
+  document.getElementById('hClass').textContent=S.classIcon+' '+S.className;
+  document.getElementById('hLvl').innerHTML='⭐ <b>'+S.level+'</b> · '+S.xp;
+  const hp=Math.max(0,Math.round(S.hp/S.maxhp*100));
+  document.getElementById('hpHp').style.width=hp+'%';
+  document.getElementById('pHc').textContent=S.potions.heal;
+  document.getElementById('pBc').textContent=S.potions.buff;
+  const pc=document.getElementById('pBuff');
+  pc.className='potbtn'+(S.potions.buff?'':' off');
+}
+function flash(t){
+  const m=document.getElementById('msg'); m.textContent=t; m.style.display='block';
+  clearTimeout(flash.__t); flash.__t=setTimeout(()=>{m.style.display='none';},2200);
+}
+
+// ---------- MOVER ----------
+function mv(dx,dy){
+  if(inBattle){ flash('Você está em batalha!'); return; }
+  if(busy) return; busy=true;
+  fetch(API+'/api/move',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,dx,dy})})
+    .then(r=>r.json()).then(d=>{
+      if(d.error){ flash(d.error); busy=false; return; }
+      if(d.battle){ openBattle(d.battle); }
+      S.pos=d.world.pos; S.phase=d.world.phase; S.world=d.world;
+      draw(); busy=false;
+    }).catch(()=>{flash('Erro de conexão.'); busy=false;});
+}
+
+// ---------- INTERAGIR ----------
+function doInteract(){
+  if(inBattle) return;
+  fetch(API+'/api/interact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId})})
+    .then(r=>r.json()).then(d=>{
+      if(d.error){ flash(d.error); return; }
+      if(d.npc.kind==='seller'||d.npc.kind==='smith'||d.npc.kind==='trainer') openShop(d);
+      else if(d.npc.kind==='boss') openBoss(d);
+    }).catch(()=>flash('Erro ao falar.'));
+}
+function nearBoss(){ return S.world && Math.abs(S.pos.x-15)<=1 && Math.abs(S.pos.y-4)<=1; }
+
+function openShop(d){
+  const card=document.getElementById('shopCard');
+  const npc=d.npc;
+  let h='<div class="btitle">'+npc.icon+' '+npc.name+' « '+npc.name+' »</div>';
+  if(npc.kind==='seller'){
+    h+='<div style="font-size:13px;margin-bottom:8px;color:#9cf;">Poções para usar em batalha (também tem o botão 🧪 no HUD para curar fora da luta):</div>';
+    d.shop.forEach(it=>{
+      h+='<div class="ii"><div class="ic">'+it.icon+'</div><div class="inf"><div class="nm">'+it.name+'</div><div class="ds">'+it.desc+'</div></div><button onclick="buyItem(\'potion\',\''+it.id+'\')">💰 '+it.cost+'</button></div>';
+    });
+    h+='<div class="ii"><div class="ic">🧺</div><div class="inf"><div class="nm">Você possui</div><div class="ds">Poção de Vida: '+'<b>'+S.potions.heal+'</b> · Poção de Força: <b>'+S.potions.buff+'</b></div></div></div>';
+  } else if(npc.kind==='smith'){
+    h+='<div style="font-size:13px;margin-bottom:8px;color:#9cf;">Aperfeiçoe equipamento e fique mais forte nos duelos:</div>';
+    const slots={sword:S.gear.sword,armor:S.gear.armor,tool:S.gear.tool};
+    ['sword','armor','tool'].forEach(slot=>{
+      const label={sword:'🗡️ ESPADAS',armor:'🛡️ ARMADURAS',tool:'🧰 FERRAMENTAS'}[slot];
+      h+='<div style="font-weight:bold;color:#ffd700;margin:8px 0 4px;font-size:13px;">'+label+'</div>';
+      d.shop.filter(it=>it.slot===slot).forEach(it=>{
+        const owned=slots[slot]===d.shop.filter(x=>x.slot===slot).indexOf(it);
+        const txt=it.atk?('+'+it.atk+' atk'):(it.def?('+'+it.def+' def'):('+'+it.hp+' hp'));
+        const btn=owned?'<button class="locked">✅ equipado</button>':'<button onclick="buyItem(\'gear\',\''+it.id+'\')">💰 '+it.cost+'</button>';
+        h+='<div class="ii '+(owned?'owned':'')+'"><div class="ic">'+it.icon+'</div><div class="inf"><div class="nm">'+it.name+'</div><div class="ds">'+txt+'</div></div>'+btn+'</div>';
+      });
+    });
+  } else {
+    h+='<div style="font-size:13px;margin-bottom:8px;color:#9cf;">Troque de CLASSE e fique um campeão muito mais forte! Melhorar a classe aumenta ATAQUE, DEFESA e VIDA.</div>';
+    h+='<div class="ii"><div class="ic">'+S.classIcon+'</div><div class="inf"><div class="nm">Classe atual: '+S.className+'</div><div class="ds">Nível '+S.level+' · vitórias '+S.wins+'</div></div></div>';
+    if(d.next){
+      const n=d.next;
+      const can=n.lvl<=S.level;
+      const btn=can?'<button onclick="buyItem(\'class\',\'1\')">💰 '+n.cost+'</button>':'<button class="locked">precisa Nível '+n.lvl+'</button>';
+      h+='<div class="ii"><div class="ic">'+n.icon+'</div><div class="inf"><div class="nm">Próxima: '+n.name+'</div><div class="ds">+'+n.bonus.atk+' atk · +'+n.bonus.def+' def · +'+n.bonus.hp+' vida</div></div>'+btn+'</div>';
+    } else {
+      h+='<div class="ii"><div class="ic">👑</div><div class="inf"><div class="nm">Classe máxima!</div></div></div>';
+    }
+  }
+  h+='<button class="btn btnz" style="width:100%;" onclick="closeOv(\'shopOverlay\')">Fechar loja</button>';
+  card.innerHTML=h;
+  document.getElementById('shopOverlay').style.display='flex';
+}
+function buyItem(type,arg){
+  const cost={
+    'potion:heal':40,'potion:buff':60,
+    'gear:sword:0':120,'gear:sword:1':300,'gear:sword:2':700,
+    'gear:armor:0':100,'gear:armor:1':280,'gear:armor:2':650,
+    'gear:tool:0':90,'gear:tool:1':260,'gear:tool:2':600,
+    'class:1':(S.nextClass?S.nextClass.cost:0)
+  };
+  fetch(API+'/api/shop/buy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,type,arg})})
+    .then(r=>r.json()).then(d=>{
+      if(d.error){ flash(d.error); if(/Moedas insuficientes/.test(d.error)) openStore(); return; }
+      coins=d.balance;
+      flash('✔ '+d.name+' '+({potion:'adicionado!',gear:'equipado!',class:'— você subiu de classe!'}[type]));
+      closeOv('shopOverlay'); loadChar(()=>{});
+    }).catch(()=>flash('Erro na loja.'));
+}
+
+function openBoss(d){
+  document.getElementById('bossName').textContent=d.boss.name;
+  document.getElementById('bossFee').textContent=d.boss.fee;
+  document.getElementById('bossOverlay').style.display='flex';
+}
+function fightBoss(){
+  closeOv('bossOverlay');
+  fetch(API+'/api/battle/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId})})
+    .then(r=>r.json()).then(d=>{
+      if(d.error){ flash(d.error); if(/Moedas insuficientes/.test(d.error)) openStore(); return; }
+      coins=d.balance; openBattle(d.battle);
+    }).catch(()=>flash('Erro ao lutar.'));
+}
+
+// ---------- BATALHA ----------
+function openBattle(b){
+  inBattle=true; battle=b;
+  document.getElementById('battleOverlay').style.display='flex';
+  renderBattle(b);
+}
+function renderBattle(b){
+  document.getElementById('bLvl').textContent=b.level;
+  document.getElementById('beName').textContent=b.enemyName||'Inimigo';
+  document.getElementById('beType').textContent=b.type==='boss'?'☠️ CHEFE':'👾';
+  document.getElementById('eF').querySelector('.bemo').textContent=b.type==='boss'?'☠️':'👾';
+  const pp=Math.max(0,b.playerHp/b.maxhp*100), ep=Math.max(0,b.enemyHp/b.enemyMaxHp*100);
+  document.getElementById('bphp').style.width=pp+'%';
+  document.getElementById('behp').style.width=ep+'%';
+  document.getElementById('bphpT').textContent=b.playerHp+'/'+b.maxhp;
+  document.getElementById('behpT').textContent=b.enemyHp+'/'+b.enemyMaxHp;
+  const bl=document.getElementById('blog');
+  bl.innerHTML=b.log.slice(-13).map(l=>'<div>'+l+'</div>').join('');
+  bl.scrollTop=bl.scrollHeight;
+  const potLabel=document.getElementById('battleOverlay').querySelector('.bact .btn:last-child');
+  potLabel.textContent='🧪 Poção ('+(b.potions.heal+b.potions.buff)+')';
+}
+function bAction(a){
+  fetch(API+'/api/battle/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,action:a})})
+    .then(r=>r.json()).then(d=>{
+      if(d.error){ flash(d.error); return; }
+      battle=d.battle;
+      if(a==='defender')sfxDef(); else sfxSlash();
+      document.getElementById('pF').classList.remove('hit'); void document.getElementById('pF').offsetWidth; document.getElementById('pF').classList.add('hit');
+      renderBattle(battle);
+      if(d.win===true){ setTimeout(()=>{ sfxWin(); showWin(d); },600); }
+      else if(d.win===false){ setTimeout(()=>{ sfxLose(); showLose(); },600); }
+    }).catch(()=>flash('Erro na batalha.'));
+}
+function bPotionMenu(){
+  if(!battle) return;
+  const ch=prompt('Poções (uma por turno):\n1 = Poção de Vida 🧪 ('+(battle.potions.heal||0)+')\n2 = Poção de Força 🔥 ('+(battle.potions.buff||0)+')\n(vazio = cancelar)');
+  if(ch==='1') bAction('potion-heal');
+  else if(ch==='2') bAction('potion-buff');
+}
+function counts(){ return battle?(battle.potions.heal+battle.potions.buff):0; }
+function showWin(d){
+  document.getElementById('winTxt').innerHTML='Você derrotou o '+d.battle.enemyName+'!<br>'+((d.battle.reward>0)?('💰 +'+d.battle.reward+' moedas'):'Monstro derrotado!')+(d.battle.leveled?'<br>🆙 <b>Subiu de nível!</b>':'');
+  document.getElementById('winOv').style.display='flex'; confetti();
+}
+function showLose(){
+  document.getElementById('loseTxt').textContent='Você perdeu a entrada (chefe) ou fugiu para o acampamento (monstro). Vá beber uma poção e tente de novo!';
+  document.getElementById('loseOv').style.display='flex';
+}
+function winClose(){
+  document.getElementById('winOv').style.display='none';
+  document.getElementById('loseOv').style.display='none';
+  inBattle=false;
+  loadChar(()=>{draw();});
+}
+function confetti(){
+  const w=document.getElementById('winOv');
+  const cols=['#ffd700','#ff8c00','#7dff7d','#39c0ff','#ff5e8a'];
+  for(let i=0;i<50;i++){const c=document.createElement('div');c.className='confetti';c.style.left=Math.random()*100+'vw';c.style.background=cols[i%5];c.style.animationDelay=(Math.random()*3)+'s';w.appendChild(c);}
+  setTimeout(()=>w.querySelectorAll('.confetti').forEach(c=>c.remove()),3500);
+}
+function usePotionNow(which){
+  if(which==='buff'){ flash('Poção de Força só na batalha!'); return; }
+  if(!S.potions.heal){ flash('Você não tem Poção de Vida. Compre no Vendedor 🧙'); return; }
+  fetch(API+'/api/potion',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,which})})
+    .then(r=>r.json()).then(d=>{
+      if(d.error){ flash(d.error); return; }
+      S.hp=d.hp; S.potions=d.potions; sfxBuy(); flash('🧪 HP restaurado!'); renderHud(); draw();
+    }).catch(()=>flash('Erro.'));
+}
+
+// ---------- DESENHO ----------
+function draw(){
+  if(!S||!S.world) return;
+  const t0=performance.now();
+  cw=cv.clientWidth; ch=cv.clientHeight;
+  if(cv.width!==cw)cv.width=cw; if(cv.height!==ch)cv.height=ch;
+  const {pos}=S; const map=S.world.map;
+  // câmera centralizada
+  camX=pos.x*TILE-cw/2+TILE/2; camY=pos.y*TILE-ch/2+TILE/2;
+  camX=Math.max(0,Math.min(camX,map[0].length*TILE-cw));
+  camY=Math.max(0,Math.min(camY,map.length*TILE-ch));
+  ctx.clearRect(0,0,cw,ch);
+  const x0=Math.max(0,Math.floor(camX/TILE)), x1=Math.min(map[0].length-1,Math.ceil((camX+cw)/TILE));
+  const y0=Math.max(0,Math.floor(camY/TILE)), y1=Math.min(map.length-1,Math.ceil((camY+ch)/TILE));
+  const anim=t0/300;
+  for(let y=y0;y<=y1;y++){
+    for(let x=x0;x<=x1;x++){
+      const t=map[y][x];
+      const px=x*TILE-camX, py=y*TILE-camY;
+      if(t==='.'||t==='S'){
+        ctx.fillStyle=((x+y)%2===0)?'#3f7d32':'#45913a';
+        ctx.fillRect(px,py,TILE,TILE);
+        if(t==='S'){ ctx.fillStyle='rgba(255,215,0,.25'+Math.sin(anim+ x+y)*0.1+')'; ctx.font='24px sans'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('⬛',px+TILE/2,py+TILE/2); ctx.fillStyle='rgba(255,215,0,.55)'; ctx.fillText('⛺',px+TILE/2,py+TILE/2); }
+      } else if(t==='T'){ ctx.fillStyle='#2d5a27'; ctx.fillRect(px,py,TILE,TILE); emoji(x,y,px,py,'🌲'); }
+      else if(t==='R'){ ctx.fillStyle='#46504f'; ctx.fillRect(px,py,TILE,TILE); emoji(x,y,px,py,'🪨'); }
+      else if(t==='W'){ ctx.fillStyle='#1e6fa8'; ctx.fillRect(px,py,TILE,TILE); emoji(x,y,px,py,'🌊'); }
+      ctx.strokeStyle='rgba(0,0,0,.08)'; ctx.strokeRect(px+0.5,py+0.5,TILE-1,TILE-1);
+    }
+  }
+  // monstros
+  S.world.monsters.filter(m=>m.alive).forEach(m=>{
+    const mx=m.x*TILE-camX,my=m.y*TILE-camY;
+    emoji(m.x,m.y,mx,my,'👾');
+    bobbingLab(mx,my);
+  });
+  // NPCs
+  S.world.npcs.forEach(n=>{
+    const nx=n.x*TILE-camX,ny=n.y*TILE-camY;
+    if(nx<-TILE||ny<-TILE||nx>cw||ny>ch) return;
+    emoji(n.x,n.y,nx,ny,n.kind==='boss'?'☠️':n.icon);
+  });
+  // player
+  {
+    const bx=pos.x*TILE-camX,by=pos.y*TILE-camY;
+    ctx.fillStyle='rgba(0,0,0,.45)'; ctx.beginPath(); ctx.ellipse(bx+TILE/2,by+TILE-6,TILE*0.32,8,0,0,Math.PI*2); ctx.fill();
+    ctx.font='30px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('🛡️',bx+TILE/2,by+TILE/2-2);
+    // halo de classe
+    if(S.classIdx>=4){ ctx.strokeStyle='rgba(255,215,0,.7)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(bx+TILE/2,by+TILE/2,TILE/2-2,0,Math.PI*2); ctx.stroke(); }
+  }
+  // compasso do chefe
+  drawCompass();
+}
+function emoji(x,y,px,py,e){
+  ctx.font='30px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.globalAlpha=1; ctx.fillText(e,px+TILE/2,py+TILE/2);
+}
+function bobbingLab(mx,my){}
+function drawCompass(){
+  const boss=S.world.npcs.find(n=>n.kind==='boss');
+  const bx=boss.x*TILE-camX, by=boss.y*TILE-camY, cx=cw/2, cy=ch/2;
+  const dx=bx-cx, dy=by-cy;
+  const ang=Math.atan2(dy,dx);
+  const r=42;
+  if(bx>TILE&&bx<cw-TILE&&by>TILE&&by<ch-TILE) return;
+  ctx.save(); ctx.translate(cx,cy); ctx.rotate(ang);
+  ctx.fillStyle='rgba(255,70,70,.9)';
+  ctx.beginPath(); ctx.moveTo(r,0); ctx.lineTo(r-14,-10); ctx.lineTo(r-14,10); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  ctx.font='12px sans'; ctx.fillStyle='#f88'; ctx.textAlign='center';
+  ctx.fillText('CHEFE ☠️', cx+dx/r*52, cy+dy/r*52);
+}
+
+// ---------- UI ----------
+function closeOv(id){ document.getElementById(id).style.display='none'; }
+function openCharSheet(){
+  const p=S;
+  document.getElementById('sheetBody').innerHTML=
+    '<div style="text-align:center;font-size:52px;margin-bottom:6px;">'+p.classIcon+'</div>'+
+    '<div style="text-align:center;font-weight:bold;font-size:16px;">'+p.className+'</div>'+
+    '<div style="text-align:center;font-size:13px;color:#9cf;margin-bottom:10px;">Fase '+p.phase+' · Nível '+p.level+' · Vitórias '+p.wins+'</div>'+
+    '<div class="pf"><div class="hpbar" style="width:100%;"><div class="hpfill" id="shp" style="width:'+Math.max(0,p.hp/p.maxhp*100)+'%"></div></div><div style="font-size:12px;margin-top:3px;">❤️ '+p.hp+'/'+p.maxhp+'</div></div>'+
+    '<div style="display:flex;gap:6px;margin:8px 0;flex-wrap:wrap;">'+
+      '<span class="pill">🗡️ '+p.stats.atk+'</span><span class="pill">🛡️ '+p.stats.def+'</span><span class="pill">❤️ '+p.stats.maxhp+'</span>'+
+    '</div>'+
+    '<div style="margin:8px 0 4px;font-weight:bold;color:#ffd700;">Equipamento</div>'+
+    '<div style="font-size:13px;line-height:1.6;">🗡️ '+p.gearNames.sword+'<br>🛡️ '+p.gearNames.armor+'<br>🧰 '+p.gearNames.tool+'</div>'+
+    '<div style="margin:8px 0 4px;font-weight:bold;color:#ffd700;">Poções</div>'+
+    '<div style="font-size:13px;">🧪 Vida: '+p.potions.heal+' · 🔥 Força: '+p.potions.buff+'</div>'+
+    (p.nextClass?('<div style="margin-top:10px;padding:8px;background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.4);border-radius:10px;font-size:13px;">Próxima classe: '+p.nextClass.icon+' <b>'+p.nextClass.name+'</b> (Nível '+p.nextClass.lvl+' · 💰 '+p.nextClass.cost+')</div>'):'');
+  document.getElementById('sheOverlay').style.display='flex';
+}
+function nothing(){ flash('Ande até um personagem e toque em 💬 Falar'); }
+function toggleSound(){} 
+
+// ---------- PIX ----------
+function openStore(){ document.getElementById('pixOv').style.display='flex'; document.getElementById('pixStatus').textContent=''; }
+function closeStore(){ if(pixTimer){clearInterval(pixTimer);pixTimer=null;} document.getElementById('pixOv').style.display='none'; }
+function buyPack(p){
+  fetch(API+'/api/create-pix',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,packId:p.id})})
+    .then(r=>r.json()).then(d=>{
+      if(d.error){ flash(d.error); return; }
+      document.getElementById('pixInfo').textContent=p.name+' — R$ '+p.brl.toFixed(2).replace('.',',')+' = '+p.coins+' moedas';
+      document.getElementById('pixImg').src='data:image/png;base64,'+d.qrCodeBase64;
+      document.getElementById('pixCode').value=d.qrCode;
+      document.getElementById('pixStatus').dataset.pid=d.paymentId;
+      document.getElementById('pixStatus').textContent='';
+      document.getElementById('pixOv').style.display='flex';
+    }).catch(()=>flash('Falha ao conectar.'));
+}
+function showPacks(from){
+  PACKS=from; const row=document.getElementById('pixPacks'); row.innerHTML='';
+  from.forEach((p,i)=>{
+    const b=document.createElement('button');
+    b.style.cssText='background:#2ecc71;padding:8px 10px;border:none;border-radius:8px;color:#fff;font-weight:bold;font-size:12px;cursor:pointer;';
+    b.textContent=(['🪙','💰','💎'][i]||'🪙')+' '+p.name+' · R$ '+p.brl.toFixed(2).replace('.',',');
+    b.onclick=()=>buyPack(p);
+    row.appendChild(b);
+  });
+}
+function copyPix(){ const t=document.getElementById('pixCode'); t.select(); navigator.clipboard?.writeText(t.value); document.getElementById('pixStatus').textContent='Código copiado!'; }
+function checkPix(){
+  const pid=document.getElementById('pixStatus').dataset.pid;
+  if(!pid){ document.getElementById('pixStatus').textContent='Nenhum pagamento ainda.'; return; }
+  const st=document.getElementById('pixStatus'); st.textContent='Verificando pagamento...';
+  if(pixTimer){clearInterval(pixTimer);pixTimer=null;}
+  const poll=()=>{
+    fetch(API+'/api/payment-status/'+pid).then(r=>r.json()).then(d=>{
+      if(d.status==='approved'){ st.textContent='✅ Aprovado! +'+d.coins+' moedas'; if(pixTimer){clearInterval(pixTimer);pixTimer=null;} setTimeout(()=>{closeStore();loadChar();},1200); }
+      else if(d.status==='pending'){ st.textContent='⏳ Aguardando pagamento...'; }
+      else st.textContent='Status: '+d.status;
+    }).catch(()=>st.textContent='Erro ao verificar');
+  };
+  poll(); pixTimer=setInterval(poll,4000);
+}
+
+// ---------- SOM ----------
+let AC=null;
+function ac(){ if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}} return AC; }
+function tone(fr,dur,type,vol){
+  if(!soundOn)return; const c=ac(); if(!c)return;
+  const o=c.createOscillator(),g=c.createGain();
+  o.type=type||'sine';o.frequency.value=fr;g.gain.value=vol||.2;
+  g.gain.exponentialRampToValueAtTime(.001,c.currentTime+dur);
+  o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+dur);
+}
+function sfxSlash(){ for(let i=0;i<4;i++)setTimeout(()=>tone(200+i*120,.09,'sawtooth',.18),i*40); }
+function sfxDef(){ tone(150,.2,'triangle',.15); }
+function sfxWin(){ for(let i=0;i<8;i++)setTimeout(()=>tone(400+i*130,.18,'triangle',.2),i*120); }
+function sfxLose(){ for(let i=5;i>=0;i--)setTimeout(()=>tone(300-i*40,.25,'sine',.15),(5-i)*160); }
+function sfxBuy(){ tone(500,.1,'sine',.15); setTimeout(()=>tone(800,.15,'sine',.15),90); }
+
+// ---------- TECLADO ----------
+document.addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  if(inBattle){ if(['1','2'].includes(k)) bPotionMenu(); return; }
+  if(k==='w'||k==='arrowup'||k==='a'||k==='arrowleft'||k==='s'||k==='arrowdown'||k==='d'||k==='arrowright'){
+    e.preventDefault();
+    const z=new Map([['arrowup',[0,-1]],['w',[0,-1]],['arrowdown',[0,1]],['s',[0,1]],['arrowleft',[-1,0]],['a',[-1,0]],['arrowright',[1,0]],['d',[1,0]]]);
+    const [dx,dy]=z.get(k); mv(dx,dy);
+  }
+  else if(k==='e') doInteract();
+  else if(k==='p') usePotionNow('heal');
+});
+
+// ---------- INÍCIO ----------
+fetch(API+'/api/packs').then(r=>r.json()).then(showPacks).catch(()=>{});
+loadChar(()=>{draw();});
+setInterval(()=>{ if(!inBattle) draw(); }, 400);
+window.addEventListener('resize',draw);
+</script>
+</body>
+</html>
