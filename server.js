@@ -4,6 +4,7 @@ const cors = require('cors');
 const path = require('path');
 const pix = require('./pix');
 const db = require('./db');
+const arena = require('./arena');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -38,6 +39,9 @@ app.use(cors());
 // Jogo (arquivo estático)
 // -------------------------------------------------------
 app.use(express.static(GAME_DIR));
+
+// Cash Royale (battle royale) também é servido por este mesmo serviço
+app.use('/royale', express.static(path.join(__dirname, 'cash-royale', 'public')));
 
 // -------------------------------------------------------
 // PACKS: pacotes de moedas vendidos via Pix
@@ -194,10 +198,42 @@ app.post('/api/add', async (req, res) => {
 });
 
 // -------------------------------------------------------
-// 5) Listar pacotes disponíveis
+// 7) Listar pacotes
 // -------------------------------------------------------
 app.get('/api/packs', (req, res) => {
   res.json(PACKS.map(p => ({ id: p.id, name: p.name, brl: p.brl, coins: p.coins })));
+});
+
+// -------------------------------------------------------
+// 8) ARENA CASH ROYALE (battle royale)
+// -------------------------------------------------------
+app.get('/api/arena/status', (req, res) => {
+  res.json(arena.status());
+});
+
+app.post('/api/arena/join', async (req, res) => {
+  try {
+    const { userId, nick } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
+    const r = await arena.join(db, userId, nick);
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    console.error('Erro ao entrar na arena:', err.message);
+    res.status(500).json({ error: 'Erro ao entrar na arena' });
+  }
+});
+
+app.post('/api/arena/leave', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
+    const r = await arena.leave(db, userId);
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao sair' });
+  }
 });
 
 // -------------------------------------------------------
@@ -212,6 +248,7 @@ app.post('/api/victory-bonus', async (req, res) => {
 });
 
 db.initDb().then(() => {
+  arena.startLoop(db);
   app.listen(PORT, () => {
     console.log(`✅ Servidor rodando em http://localhost:${PORT}`);
     console.log(`   Jogo servido de: ${GAME_DIR}`);
