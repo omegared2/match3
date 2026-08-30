@@ -5,6 +5,7 @@ const path = require('path');
 const pix = require('./pix');
 const db = require('./db');
 const arena = require('./arena');
+const rpg = require('./rpg');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -42,6 +43,9 @@ app.use(express.static(GAME_DIR));
 
 // Cash Royale (battle royale) também é servido por este mesmo serviço
 app.use('/royale', express.static(path.join(__dirname, 'cash-royale', 'public')));
+
+// Batalha do Cavaleiro
+app.get('/batalha', (req, res) => res.sendFile(path.join(__dirname, 'public', 'batalha.html')));
 
 // -------------------------------------------------------
 // PACKS: pacotes de moedas vendidos via Pix
@@ -233,6 +237,57 @@ app.post('/api/arena/leave', async (req, res) => {
     res.json(r);
   } catch (err) {
     res.status(500).json({ error: 'Erro ao sair' });
+  }
+});
+
+// -------------------------------------------------------
+// 9) BATALHA DO CAVALEIRO (RPG)
+// -------------------------------------------------------
+app.get('/api/char/:userId', async (req, res) => {
+  try {
+    const p = await rpg.profile(db, req.params.userId);
+    res.json({ ...p, kit: rpg.kit(), coins: (await db.dbGetUser(req.params.userId)).balance, entryCost: rpg.entryCost(p.level) });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao carregar personagem' });
+  }
+});
+
+app.post('/api/battle/start', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
+    const r = await rpg.startBattle(db, userId);
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    console.error('Erro ao iniciar batalha:', err.message);
+    res.status(500).json({ error: 'Erro ao iniciar batalha' });
+  }
+});
+
+app.post('/api/battle/action', async (req, res) => {
+  try {
+    const { userId, action } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
+    const r = await rpg.act(db, userId, action || 'attack');
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    console.error('Erro na batalha:', err.message);
+    res.status(500).json({ error: 'Erro na batalha' });
+  }
+});
+
+app.post('/api/gear/buy', async (req, res) => {
+  try {
+    const { userId, slot, idx } = req.body;
+    if (!userId || !slot || idx === undefined) return res.status(400).json({ error: 'userId, slot e idx obrigatórios' });
+    const r = await rpg.buyGear(db, userId, slot, +idx);
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    console.error('Erro ao comprar equipamento:', err.message);
+    res.status(500).json({ error: 'Erro ao comprar equipamento' });
   }
 });
 

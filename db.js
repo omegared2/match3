@@ -7,6 +7,7 @@ let mode = 'memory';
 
 const memUsers = new Map();
 const memPayments = new Map();
+const memChars = new Map();
 
 function memoryUser(id) {
   if (!memUsers.has(id)) memUsers.set(id, { balance: 100 });
@@ -29,6 +30,12 @@ async function initDb() {
         pack_id TEXT,
         coins INTEGER,
         status TEXT DEFAULT 'pending'
+      )`
+    );
+    await pool.query(
+      `CREATE TABLE IF NOT EXISTS characters (
+        id TEXT PRIMARY KEY,
+        data JSONB NOT NULL
       )`
     );
     mode = 'postgres';
@@ -118,6 +125,37 @@ async function dbApprovePayment(paymentId) {
   return r.rowCount ? r.rows[0] : null;
 }
 
+// ---------------- Personagens (Batalha do Cavaleiro) ----------------
+
+function defaultChar() {
+  return { level: 1, xp: 0, wins: 0, gear: { sword: -1, armor: -1, tool: -1 } };
+}
+
+async function dbGetCharacter(id) {
+  if (mode === 'memory') {
+    if (!memChars.has(id)) memChars.set(id, defaultChar());
+    return JSON.parse(JSON.stringify(memChars.get(id)));
+  }
+  const r = await pool.query('SELECT data FROM characters WHERE id=$1', [id]);
+  if (r.rowCount === 0) {
+    const d = defaultChar();
+    await pool.query('INSERT INTO characters(id,data) VALUES($1,$2) ON CONFLICT(id) DO NOTHING', [id, JSON.stringify(d)]);
+    return d;
+  }
+  return r.rows[0].data;
+}
+
+async function dbSetCharacter(id, data) {
+  if (mode === 'memory') {
+    memChars.set(id, JSON.parse(JSON.stringify(data)));
+    return;
+  }
+  await pool.query(
+    'INSERT INTO characters(id,data) VALUES($1,$2) ON CONFLICT(id) DO UPDATE SET data=EXCLUDED.data',
+    [id, JSON.stringify(data)]
+  );
+}
+
 module.exports = {
   initDb,
   dbGetUser,
@@ -125,5 +163,8 @@ module.exports = {
   dbSpendCoins,
   dbSavePayment,
   dbGetPayment,
-  dbApprovePayment
+  dbApprovePayment,
+  dbGetCharacter,
+  dbSetCharacter,
+  defaultChar
 };
