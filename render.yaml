@@ -1,0 +1,19 @@
+# Blueprint do Render: cria o Web Service do jogo.
+# (o banco Neon fica separado - a connection string vai em DATABASE_URL)
+services:
+  - type: web
+    name: match3
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm install --omit=dev
+    startCommand: node server.js
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: MP_ACCESS_TOKEN
+        sync: false
+      - key: BASE_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
