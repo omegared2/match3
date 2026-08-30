@@ -9,6 +9,26 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const GAME_DIR = process.env.GAME_DIR || path.join(__dirname, 'public');
 
+// Envia um aviso para o Telegram do dono (se configurado)
+async function notifyTelegram(text) {
+  const token = process.env.BOT_TOKEN;
+  const chatId = process.env.TG_CHAT_ID;
+  if (!token || !chatId) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text })
+    });
+  } catch (err) {
+    console.error('Erro ao notificar Telegram:', err.message);
+  }
+}
+function packLabel(packId) {
+  const pp = PACKS.find(p => p.id === packId);
+  return pp ? `R$ ${pp.brl.toFixed(2).replace('.', ',')} (${pp.coins} moedas)` : packId || '';
+}
+
 // Para o webhook do Mercado Pago precisamos dos dados brutos (raw body)
 app.use('/api/webhook', express.raw({ type: '*/*' }));
 app.use(express.json());
@@ -83,6 +103,7 @@ app.get('/api/payment-status/:paymentId', async (req, res) => {
         await db.dbAddCoins(stored.userId, stored.coins);
         credited = true;
         coins = stored.coins;
+        notifyTelegram(`💰 Pix PAGO! Compra ${packLabel(stored.packId)} · +${stored.coins} moedas\n👤 Jogador: ${stored.userId}\n🧾 Pagamento: ${paymentId}`);
       } else {
         const p = await db.dbGetPayment(paymentId);
         coins = p ? p.coins : 0;
@@ -118,6 +139,7 @@ app.post('/api/webhook/mp', (req, res) => {
           if (stored) {
             await db.dbAddCoins(stored.userId, stored.coins);
             console.log(`Pagamento ${paymentId} aprovado +${stored.coins} moedas para ${stored.userId}`);
+            notifyTelegram(`💰 Pix PAGO! Compra ${packLabel(stored.packId)} · +${stored.coins} moedas\n👤 Jogador: ${stored.userId}\n🧾 Pagamento: ${paymentId}`);
           }
         }
       }).catch(e => console.error('Erro no webhook:', e.message));
