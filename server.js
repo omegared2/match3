@@ -7,7 +7,7 @@ const db = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const GAME_DIR = process.env.GAME_DIR || path.join(__dirname, '../match3');
+const GAME_DIR = process.env.GAME_DIR || path.join(__dirname, 'public');
 
 // Para o webhook do Mercado Pago precisamos dos dados brutos (raw body)
 app.use('/api/webhook', express.raw({ type: '*/*' }));

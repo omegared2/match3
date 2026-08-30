@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Match-3 - Loja R$</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body {
+    font-family: Arial, sans-serif;
+    background: radial-gradient(circle at 20% 20%, #1a2a6c, #3a0ca3 60%, #6a0dad);
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    color:#fff; user-select:none; overflow-x:hidden;
+  }
+  h1 { margin:10px 0 6px; letter-spacing:2px; text-shadow:0 0 12px #fdbb2d; }
+  #hud { display:flex; align-items:center; gap:14px; margin:6px 0 8px; font-weight:bold; font-size:17px; flex-wrap:wrap; justify-content:center; }
+  .pill { background:rgba(255,255,255,0.15); padding:6px 14px; border-radius:20px; display:flex; align-items:center; gap:6px; }
+  #grid { display:grid; gap:4px; padding:8px; background:rgba(255,255,255,0.08); border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,0.6); touch-action:none; }
+  .cell { width:42px; height:42px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:28px; cursor:pointer; box-shadow:inset 0 -4px 0 rgba(0,0,0,0.25),0 2px 6px rgba(0,0,0,0.3); }
+  .cell.selected { transform:scale(0.88); box-shadow:0 0 0 3px #fdbb2d,0 0 18px #fdbb2d; }
+  @keyframes explode { 0%{transform:scale(1);opacity:1;} 100%{transform:scale(2);opacity:0;} }
+  .exploding { animation:explode 0.4s forwards; }
+  @keyframes pop { 0%{transform:scale(0);} 60%{transform:scale(1.3);} 100%{transform:scale(1);} }
+  .pop { animation:pop 0.35s ease; }
+  @keyframes fall { 0%{transform:translateY(-34px);opacity:.3;} 100%{transform:translateY(0);opacity:1;} }
+  .fall { animation:fall .35s ease-out; }
+  @media (max-width:430px){ .cell{width:34px;height:34px;font-size:23px;border-radius:8px;} #grid{grid-template-columns:repeat(8,34px)!important;} }
+  @media (max-width:340px){ .cell{width:30px;height:30px;font-size:20px;border-radius:7px;} #grid{grid-template-columns:repeat(8,30px)!important;} }
+  #msg { margin-top:8px; min-height:20px; font-size:14px; text-align:center; text-shadow:1px 1px 3px #000; padding:0 10px; }
+
+  h2 { margin:14px 0 4px; font-size:17px; text-shadow:0 0 8px #fdbb2d; }
+  #packs, #shop { width:100%; max-width:560px; display:grid; gap:10px; padding:0 12px; }
+  #packs { grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); margin-bottom:14px; }
+  #shop { grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); }
+  .item { background:linear-gradient(140deg,#fdbb2d,#b21f1f); border-radius:14px; padding:12px; text-align:center; cursor:pointer; box-shadow:0 6px 14px rgba(0,0,0,0.4); transition:transform 0.15s; }
+  .item:active { transform:scale(0.95); }
+  .item.pack { background:linear-gradient(140deg,#2ecc71,#16a085); }
+  .item .icon { font-size:30px; }
+  .item .name { font-weight:bold; font-size:14px; margin:4px 0 2px; }
+  .item .price { font-size:15px; font-weight:bold; background:rgba(0,0,0,0.3); border-radius:12px; padding:3px 10px; display:inline-block; margin-top:4px; }
+  .item .stock { font-size:11px; margin-top:4px; opacity:0.9; }
+  .btn { padding:8px 16px; border:none; border-radius:10px; cursor:pointer; font-weight:bold; font-size:15px; background:#fdbb2d; color:#333; }
+  .btn:active{transform:scale(0.95);}
+  #win {
+    position:fixed; inset:0; background:rgba(0,0,0,0.85);
+    display:none; flex-direction:column; align-items:center; justify-content:center;
+    z-index:50; text-align:center; padding:20px;
+    animation:fadeIn 0.5s;
+  }
+  @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+  #win .big { font-size:70px; animation:bounce 1s infinite; }
+  @keyframes bounce{0%,100%{transform:translateY(0);}50%{transform:translateY(-15px);}}
+  #win h2 { font-size:36px; margin:8px 0; text-shadow:0 0 20px #fdbb2d; letter-spacing:2px; }
+  #win .confetti { position:absolute; width:10px; height:14px; animation:fall 3s linear infinite; opacity:0.9; }
+  @keyframes fall{0%{transform:translateY(-20px) rotate(0);opacity:1;}100%{transform:translateY(100vh) rotate(720deg);opacity:0;}}
+  .sound-toggle { position:fixed; top:10px; right:10px; z-index:40; background:rgba(0,0,0,0.4); border:none; border-radius:10px; padding:6px 10px; font-size:20px; cursor:pointer; }
+</style>
+</head>
+<body>
+  <button class="sound-toggle" id="soundBtn" onclick="toggleSound()">🔊</button>
+  <h1>⭐ MATCH-3 ⭐</h1>
+<div id="hud">
+  <span class="pill">💰 Moedas: <b id="coins">100</b></span>
+  <span class="pill">🏆 <b id="score">0</b></span>
+  <button class="btn" onclick="newGame()">Novo Jogo</button>
+</div>
+<div id="grid"></div>
+<div id="msg">Troque peças para combinar 3+! Compre moedas e vantagens!</div>
+
+<h2>💰 PACOTES DE MOEDAS (R$)</h2>
+<div id="packs"></div>
+
+<h2>🛒 LOJA DE VANTAGENS</h2>
+<div id="shop"></div>
+
+<div id="win">
+  <div class="big">🏆</div>
+  <h2>VITÓRIA!</h2>
+  <p style="font-size:20px;margin-bottom:8px;">Você alcançou 10.000 pontos!</p>
+  <p style="font-size:16px;margin-bottom:20px;">Pontuação: <b id="winScore">0</b> • Moedas: <b id="winCoins">0</b></p>
+  <button class="btn" style="font-size:18px;padding:12px 30px;" onclick="closeWin();newGame();">Jogar novamente 🎮</button>
+</div>
+
+<script>
+const COLS=8, ROWS=8;
+const TYPES=['🍎','🍋','🍇','🔵','🟣','🟠'];
+const gridEl=document.getElementById('grid');
+const msgEl=document.getElementById('msg');
+const scoreEl=document.getElementById('score');
+const coinsEl=document.getElementById('coins');
+let grid=[], score=0, coins=100, selected=null, pendingBoost=null, animating=false;
+let soundOn=true, audioCtx=null, won=false;
+const WIN_TARGET=10000;
+
+// ===== BACKEND PIX (Mercado Pago) =====
+const API=''; // backend mesmo domínio (Express serve o jogo + API)
+let userId = localStorage.getItem('match3_user') || ('player_'+Math.random().toString(36).slice(2,10));
+localStorage.setItem('match3_user', userId);
+
+// Pacotes em reais - preços vêm do backend
+let PACKS=[
+  {id:'p1', icon:'🪙', name:'Carregando...', brl:'R$ 1,00', coins:100}
+];
+
+const inventory={ bomb:0, swapAll:0, wild:0, bonus:0 };
+
+const SHOP=[
+  {id:'bomb',    icon:'💣', name:'Bomba',        price:150, desc:'Toque numa peça para explodir a área'},
+  {id:'swapAll', icon:'🔀', name:'Reembaralhar', price:80,  desc:'Baralha todas as peças'},
+  {id:'wild',    icon:'✨', name:'Coringa',      price:200, desc:'Vira qualquer peça em outra'},
+  {id:'bonus',   icon:'🏅', name:'+500 pontos',  price:120, desc:'Ganhe pontos imediatos'}
+];
+
+function renderPacks(){
+  const packs=document.getElementById('packs');
+  packs.innerHTML='';
+  PACKS.forEach(p=>{
+    const div=document.createElement('div');
+    div.className='item pack';
+    div.innerHTML=`<div class="icon">${p.icon}</div><div class="name">${p.name}</div><div class="price">${p.brl}</div>`;
+    div.onclick=()=>buyPack(p);
+    packs.appendChild(div);
+  });
+}
+
+function renderShop(){
+  const shop=document.getElementById('shop');
+  shop.innerHTML='';
+  SHOP.forEach(it=>{
+    const div=document.createElement('div');
+    div.className='item';
+    div.innerHTML=`<div class="icon">${it.icon}</div><div class="name">${it.name}</div><div class="price">💰 ${it.price}</div><div class="stock">na mochila: ${inventory[it.id]}</div>`;
+    div.onclick=()=>buyBoost(it.id);
+    shop.appendChild(div);
+  });
+}
+
+function buyPack(p){
+  // Cria o pagamento Pix no backend
+  msgEl.textContent='Gerando QR Code Pix...';
+  fetch(API+'/api/create-pix',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({userId, packId:p.id})
+  }).then(r=>r.json()).then(data=>{
+    if(data.error){ msgEl.textContent=data.error; return; }
+    showPixModal(data, p);
+  }).catch(()=>msgEl.textContent='Erro ao conectar no servidor. Está rodando?');
+}
+
+function showPixModal(data, pack){
+  let modal=document.getElementById('pixModal');
+  if(!modal){
+    modal=document.createElement('div');
+    modal.id='pixModal';
+    modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:60;display:flex;align-items:center;justify-content:center;';
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML=`
+    <div style="background:#fff;color:#222;border-radius:16px;padding:24px;max-width:340px;text-align:center;">
+      <h3 style="margin:0 0 10px;">Pagamento Pix</h3>
+      <p style="margin:0 0 10px;font-size:15px;">${pack.name} - <b>${pack.brl}</b></p>
+      <img src="data:image/png;base64,${data.qrCodeBase64}" style="width:200px;height:200px;border:1px solid #ddd;border-radius:8px;margin:0 auto 12px;display:block;"/>
+      <p style="font-size:13px;margin:0 0 8px;">ou copie o código:</p>
+      <textarea id="pixCode" readonly style="width:100%;height:80px;font-size:11px;border:1px solid #ccc;border-radius:8px;padding:6px;box-sizing:border-box;">${data.qrCode}</textarea>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button onclick="copyPix()" style="flex:1;padding:10px;border:none;border-radius:8px;background:#3483fa;color:#fff;font-weight:bold;cursor:pointer;">Copiar</button>
+        <button onclick="checkPix('${data.paymentId}')" style="flex:1;padding:10px;border:none;border-radius:8px;background:#2ecc71;color:#fff;font-weight:bold;cursor:pointer;">Já paguei</button>
+      </div>
+      <button onclick="closePix()" style="margin-top:8px;width:100%;padding:8px;border:none;border-radius:8px;background:#eee;cursor:pointer;">Fechar</button>
+      <p id="pixStatus" style="margin:8px 0 0;font-size:13px;"></p>
+    </div>`;
+}
+
+function copyPix(){
+  const t=document.getElementById('pixCode');
+  t.select(); navigator.clipboard?.writeText(t.value);
+  document.getElementById('pixStatus').textContent='Código copiado!';
+}
+
+let pixTimer=null;
+function checkPix(paymentId){
+  const st=document.getElementById('pixStatus');
+  st.textContent='Verificando pagamento...';
+  if(pixTimer)clearInterval(pixTimer);
+  const poll=()=>{
+    fetch(API+'/api/payment-status/'+paymentId).then(r=>r.json()).then(d=>{
+      if(d.status==='approved'){
+        st.textContent='✅ Pagamento aprovado! +'+d.coins+' moedas';
+        if(pixTimer){clearInterval(pixTimer); pixTimer=null;}
+        loadBalance();
+        setTimeout(closePix, 2000);
+      }else if(d.status==='pending'){
+        st.textContent='Aguardando pagamento...';
+      }else{
+        st.textContent='Status: '+d.status;
+      }
+    }).catch(()=>st.textContent='Erro ao verificar');
+  };
+  poll();
+  pixTimer=setInterval(poll, 4000);
+}
+
+function closePix(){
+  if(pixTimer){clearInterval(pixTimer); pixTimer=null;}
+  const m=document.getElementById('pixModal');
+  if(m)m.style.display='none';
+}
+
+function loadBalance(){
+  fetch(API+'/api/balance/'+userId).then(r=>r.json()).then(d=>{
+    coins=d.balance;
+    updateHUD();
+  }).catch(()=>{});
+}
+
+function addCoins(amount){
+  fetch(API+'/api/add',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({userId, amount})
+  }).then(r=>r.json()).then(d=>{ coins=d.balance; updateHUD(); }).catch(()=>{});
+}
+
+function buyBoost(id){
+  const it=SHOP.find(i=>i.id===id);
+  if(coins<it.price){ msgEl.textContent='Moedas insuficientes! Compre um pacote.'; return; }
+  // Desconta no backend (fonte de verdade) e atualiza local
+  fetch(API+'/api/spend',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({userId, cost:it.price})
+  }).then(r=>r.json()).then(d=>{
+    if(d.error){ msgEl.textContent=d.error; return; }
+    coins=d.balance;
+    inventory[id]++;
+    msgEl.textContent=`Comprado: ${it.name}! `+it.desc;
+    sfxBuy();
+    updateHUD();
+    renderShop();
+  }).catch(()=>msgEl.textContent='Erro ao comprar boost');
+}
+
+function updateHUD(){ coinsEl.textContent=coins; scoreEl.textContent=score; }
+
+function init(){
+  gridEl.style.gridTemplateColumns=`repeat(${COLS},42px)`;
+  do{ grid=Array.from({length:ROWS},()=>Array.from({length:COLS},()=>TYPES[Math.floor(Math.random()*TYPES.length)])); }while(hasMatch());
+  render();
+}
+function hasMatch(){ return findMatches().size>0; }
+
+function findMatches(){
+  const m=new Set();
+  for(let r=0;r<ROWS;r++){ let run=1; for(let c=1;c<COLS;c++){ if(grid[r][c]===grid[r][c-1])run++; else{ if(run>=3)for(let k=c-run;k<c;k++)m.add(r+'-'+k); run=1; } } if(run>=3)for(let k=COLS-run;k<COLS;k++)m.add(r+'-'+k); }
+  for(let c=0;c<COLS;c++){ let run=1; for(let r=1;r<ROWS;r++){ if(grid[r][c]===grid[r-1][c])run++; else{ if(run>=3)for(let k=r-run;k<r;k++)m.add(k+'-'+c); run=1; } } if(run>=3)for(let k=ROWS-run;k<ROWS;k++)m.add(k+'-'+c); }
+  return m;
+}
+
+function wantsBoost(id){ return inventory[id]>0; }
+
+function handleClick(r,c){
+  if(animating)return;
+  sfxTap();
+
+  // Aplicar boost se tiver um selecionado para usar
+  if(pendingBoost){
+    applyBoost(pendingBoost,r,c);
+    pendingBoost=null;
+    return;
+  }
+
+  // Automatizar: se possuir boost, oferece via mensagem? Mantém simples: um tap no HUD não.
+  // Usamos: bomba/coringa ativam ao tocar. swapAll/bonus usam direto pelo botão de compra? Não: há mochila.
+  // Simplificar: cada uso ativado ao tocar numa peça.
+  if(!selected){ selected=[r,c]; render(); return; }
+  const [sr,sc]=selected;
+  if((sr===r&&Math.abs(sc-c)===1)||(sc===c&&Math.abs(sr-r)===1)){
+    trySwap(sr,sc,r,c);
+    selected=null; render();
+  }else{ selected=[r,c]; render(); }
+}
+
+function trySwap(sr,sc,r,c){
+  if(animating)return false;
+  [grid[sr][sc],grid[r][c]]=[grid[r][c],grid[sr][sc]];
+  const m=findMatches();
+  if(m.size===0){ [grid[sr][sc],grid[r][c]]=[grid[r][c],grid[sr][sc]]; msgEl.textContent='Movimento inválido'; return false; }
+  msgEl.textContent='Boa! Combinou!'; sfxSwap(); processMatches(); return true;
+}
+
+// Swipe/arrastar para trocar (mobile)
+let dragFrom=null;
+gridEl.addEventListener('pointerdown',e=>{
+  if(animating){ dragFrom=null; return; }
+  const t=e.target.closest('.cell');
+  if(t){ dragFrom=[+t.dataset.r,+t.dataset.c]; }
+});
+gridEl.addEventListener('pointerenter',e=>{
+  if(!dragFrom||animating)return;
+  const t=e.target.closest('.cell'); if(!t)return;
+  const [sr,sc]=dragFrom;
+  const r=+t.dataset.r, c=+t.dataset.c;
+  if((sr===r&&Math.abs(sc-c)===1)||(sc===c&&Math.abs(sr-r)===1)){
+    dragFrom=null;
+    if(trySwap(sr,sc,r,c)){ selected=null; render(); }
+  }
+});
+document.addEventListener('pointerup',()=>{ dragFrom=null; });
+
+// Botões para usar boosts da mochila
+function useBoost(id,r,c){
+  if(inventory[id]<=0){ msgEl.textContent='Você não tem esse boost.'; pendingBoost=null; render(); return; }
+  inventory[id]--;
+  renderShop();
+  applyBoost(id,r,c);
+}
+
+function applyBoost(id,r,c){
+  switch(id){
+    case 'bomb':
+      if(r===undefined){ msgEl.textContent='Toque numa peça para explodir'; pendingBoost='bomb'; break; }
+      explodeAround(r,c);
+      break;
+    case 'swapAll':
+      shuffleNoMatch();
+      msgEl.textContent='Peças reembaralhadas!';
+      break;
+    case 'wild':
+      if(r===undefined){ msgEl.textContent='Toque numa peça para transformá-la'; pendingBoost='wild'; break; }
+      // torna peça aleatória diferente
+      let t=TYPES[Math.floor(Math.random()*TYPES.length)];
+      grid[r][c]=t;
+      render(); processMatches(); checkNoMoves();
+      break;
+    case 'bonus':
+      score+=500; updateHUD(); msgEl.textContent='+500 pontos!';
+      sfxCoin();
+      if(score>=WIN_TARGET)showWin();
+      break;
+  }
+  render();
+}
+
+function explodeAround(r,c){
+  const rr=[-1,1,0,0,-1,-1,1,1], cc=[0,0,-1,1,-1,1,-1,1];
+  const cells=new Set([r+'-'+c]);
+  for(let i=0;i<8;i++){ const nr=r+rr[i], nc=c+cc[i]; if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS)cells.add(nr+'-'+nc); }
+  cells.forEach(k=>{ const [ar,ac]=k.split('-').map(Number); grid[ar][ac]=null; });
+  score+=cells.size*5; updateHUD();
+  sfxMatch();
+  processMatches();
+  if(score>=WIN_TARGET)showWin();
+  checkNoMoves();
+}
+
+async function processMatches(){
+  let m=findMatches(), cascade=0;
+  while(m.size>0){
+    animating=true; cascade++;
+    score+=m.size*10*cascade; coins+=m.size; updateHUD();
+    addCoins(m.size);
+    sfxMatch(); if(m.size>=5)sfxCoin();
+    msgEl.textContent = cascade>1 ? `🔥 Combo x${cascade}! +${m.size*10*cascade}` : `Boa! +${m.size*10} pontos`;
+    m.forEach(key=>{ const [r,c]=key.split('-').map(Number); const cell=gridEl.children[r*COLS+c]; if(cell)cell.classList.add('exploding'); });
+    await sleep(350);
+    m.forEach(key=>{ const [r,c]=key.split('-').map(Number); grid[r][c]=null; });
+    applyGravity(); render();
+    Array.from(gridEl.children).forEach((el,i)=>{ el.classList.add('fall'); el.style.animationDelay=(i*6)+'ms'; });
+    m=findMatches();
+    if(m.size>0)await sleep(220);
+  }
+  animating=false;
+  if(score>=WIN_TARGET){ showWin(); return; }
+  checkNoMoves();
+}
+
+function applyGravity(){
+  for(let c=0;c<COLS;c++){
+    for(let r=ROWS-1;r>=0;r--){
+      if(grid[r][c]===null){
+        for(let k=r-1;k>=0;k--){ if(grid[k][c]!==null){ grid[r][c]=grid[k][c]; grid[k][c]=null; break; } }
+        if(grid[r][c]===null)grid[r][c]=TYPES[Math.floor(Math.random()*TYPES.length)];
+      }
+    }
+  }
+}
+
+function render(){
+  gridEl.innerHTML='';
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    const div=document.createElement('div');
+    div.className='cell';
+    if(selected&&selected[0]===r&&selected[1]===c)div.classList.add('selected');
+    div.textContent=grid[r][c];
+    div.dataset.r=r; div.dataset.c=c;
+    div.onclick=()=>handleClick(r,c);
+    gridEl.appendChild(div);
+  }
+  renderToolbar();
+}
+
+function renderToolbar(){
+  // Barra de ações para usar boosts
+  let bar=document.getElementById('boostbar');
+  if(!bar){ bar=document.createElement('div'); bar.id='boostbar'; bar.style.cssText='display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;justify-content:center;padding:0 10px'; gridEl.parentNode.insertBefore(bar,gridEl.nextSibling); }
+  bar.innerHTML='';
+  SHOP.forEach(it=>{
+    if(inventory[it.id]>0){
+      const b=document.createElement('button');
+      b.className='btn';
+      b.innerHTML=`${it.icon} usar (${inventory[it.id]})`;
+      b.onclick=()=>useBoost(it.id);
+      bar.appendChild(b);
+    }
+  });
+  if(pendingBoost){
+    const note=document.createElement('span'); note.style.cssText='align-self:center;font-size:13px;color:#fdbb2d'; note.textContent='→ toque numa peça'; bar.appendChild(note);
+  }
+}
+
+function checkNoMoves(){
+  let ok=false;
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    if(c+1<COLS){ [grid[r][c],grid[r][c+1]]=[grid[r][c+1],grid[r][c]]; if(hasMatch())ok=true; [grid[r][c],grid[r][c+1]]=[grid[r][c+1],grid[r][c]]; }
+    if(r+1<ROWS){ [grid[r][c],grid[r+1][c]]=[grid[r+1][c],grid[r][c]]; if(hasMatch())ok=true; [grid[r][c],grid[r+1][c]]=[grid[r+1][c],grid[r][c]]; }
+  }
+  if(!ok){ msgEl.textContent='Sem movimentos! Reembaralhando...'; shuffleNoMatch(); }
+}
+
+function shuffleNoMatch(){
+  do{ grid=Array.from({length:ROWS},()=>Array.from({length:COLS},()=>TYPES[Math.floor(Math.random()*TYPES.length)])); }while(hasMatch());
+  render();
+}
+
+function sleep(ms){ return new Promise(res=>setTimeout(res,ms)); }
+function newGame(){ score=0; selected=null; pendingBoost=null; won=false; updateHUD(); init(); msgEl.textContent='Novo jogo!'; }
+
+// ---------- SOM (Web Audio API) ----------
+function getCtx(){
+  if(!audioCtx){ try{ audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+  return audioCtx;
+}
+function tone(freq, dur=0.15, type='sine', vol=0.2){
+  if(!soundOn)return;
+  const ctx=getCtx(); if(!ctx)return;
+  const o=ctx.createOscillator(), g=ctx.createGain();
+  o.type=type; o.frequency.value=freq;
+  g.gain.value=vol; g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+dur);
+  o.connect(g); g.connect(ctx.destination);
+  o.start(); o.stop(ctx.currentTime+dur);
+}
+function sfxTap(){ tone(400,0.08,'square',0.12); }
+function sfxSwap(){ tone(300,0.1,'sine',0.15); }
+function sfxMatch(){ for(let i=0;i<4;i++)setTimeout(()=>tone(500+i*150,0.12,'triangle',0.18),i*50); }
+function sfxCoin(){ tone(700,0.1,'sine',0.15); setTimeout(()=>tone(950,0.12,'sine',0.15),70); }
+function sfxBuy(){ tone(500,0.1,'sine',0.15); setTimeout(()=>tone(800,0.15,'sine',0.15),90); }
+function sfxWin(){ for(let i=0;i<8;i++)setTimeout(()=>tone(400+i*120,0.18,'triangle',0.2),i*120); }
+function toggleSound(){
+  soundOn=!soundOn;
+  document.getElementById('soundBtn').textContent=soundOn?'🔊':'🔇';
+  if(soundOn)sfxTap();
+}
+
+// ---------- VITÓRIA ----------
+function showWin(){
+  if(won)return; won=true;
+  document.getElementById('winScore').textContent=score;
+  document.getElementById('winCoins').textContent=coins;
+  // confetes
+  const w=document.getElementById('win');
+  const colors=['#fdbb2d','#2ecc71','#3498db','#e74c3c','#9b59b6'];
+  for(let i=0;i<40;i++){
+    const c=document.createElement('div');
+    c.className='confetti';
+    c.style.left=Math.random()*100+'vw';
+    c.style.background=colors[Math.floor(Math.random()*colors.length)];
+    c.style.animationDelay=(Math.random()*3)+'s';
+    w.appendChild(c);
+  }
+  w.style.display='flex';
+  sfxWin();
+}
+function closeWin(){
+  const w=document.getElementById('win');
+  const cc=w.querySelectorAll('.confetti');
+  cc.forEach(x=>x.remove());
+  w.style.display='none';
+}
+
+function loadPacks(){
+  fetch(API+'/api/packs').then(r=>r.json()).then(d=>{
+    PACKS=d.map((p,i)=>({id:p.id, icon:['🪙','💰','💎'][i]||'🪙', name:p.name, brl:('R$ '+p.brl.toFixed(2).replace('.',',')), coins:p.coins}));
+    renderPacks();
+  }).catch(()=>{});
+}
+
+renderPacks(); renderShop(); loadBalance(); loadPacks(); newGame();
+</script>
+</body>
+</html>
