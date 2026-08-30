@@ -1,0 +1,129 @@
+// Persistência do backend.
+// Se DATABASE_URL existir -> usa Postgres (produção).
+// Senão -> usa memória (rodar localmente / testes).
+
+let pool = null;
+let mode = 'memory';
+
+const memUsers = new Map();
+const memPayments = new Map();
+
+function memoryUser(id) {
+  if (!memUsers.has(id)) memUsers.set(id, { balance: 100 });
+  return memUsers.get(id);
+}
+
+// Cria as tabelas caso não existam. Retorna o modo ativo.
+async function initDb() {
+  if (!process.env.DATABASE_URL) return 'memory';
+  try {
+    const { Pool } = require('pg');
+    pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    await pool.query(
+      `CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, balance INTEGER NOT NULL DEFAULT 100)`
+    );
+    await pool.query(
+      `CREATE TABLE IF NOT EXISTS payments (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        pack_id TEXT,
+        coins INTEGER,
+        status TEXT DEFAULT 'pending'
+      )`
+    );
+    mode = 'postgres';
+  } catch (err) {
+    console.error('⚠️  Falha ao conectar no Postgres, usando memória:', err.message);
+    pool = null;
+  }
+  return mode;
+}
+
+async function dbGetUser(id) {
+  if (mode === 'memory') return { balance: memoryUser(id).balance };
+  const r = await pool.query('SELECT balance FROM users WHERE id=$1', [id]);
+  if (r.rowCount === 0) {
+    await pool.query('INSERT INTO users(id,balance) VALUES($1,100) ON CONFLICT(id) DO NOTHING', [id]);
+    return { balance: 100 };
+  }
+  return { balance: r.rows[0].balance };
+}
+
+async function dbAddCoins(id, amount) {
+  if (mode === 'memory') {
+    const u = memoryUser(id);
+    u.balance += amount;
+    return { balance: u.balance };
+  }
+  await pool.query(
+    'INSERT INTO users(id,balance) VALUES($1,$2) ON CONFLICT(id) DO UPDATE SET balance=users.balance+$2',
+    [id, amount]
+  );
+  const r = await pool.query('SELECT balance FROM users WHERE id=$1', [id]);
+  return { balance: r.rows[0].balance };
+}
+
+// Retorna null se não tiver saldo suficiente.
+async function dbSpendCoins(id, cost) {
+  if (mode === 'memory') {
+    const u = memoryUser(id);
+    if (u.balance < cost) return null;
+    u.balance -= cost;
+    return { balance: u.balance };
+  }
+  const r = await pool.query(
+    'UPDATE users SET balance=balance-$2 WHERE id=$1 AND balance>=$2 RETURNING balance',
+    [id, cost]
+  );
+  if (r.rowCount === 0) return null;
+  return { balance: r.rows[0].balance };
+}
+
+async function dbSavePayment(paymentId, data) {
+  if (mode === 'memory') {
+    memPayments.set(paymentId, { ...data, status: 'pending' });
+    return;
+  }
+  await pool.query(
+    'INSERT INTO payments(id,user_id,pack_id,coins) VALUES($1,$2,$3,$4) ON CONFLICT(id) DO NOTHING',
+    [paymentId, data.userId, data.packId, data.coins]
+  );
+}
+
+async function dbGetPayment(paymentId) {
+  if (mode === 'memory') return memPayments.get(paymentId) || null;
+  const r = await pool.query(
+    'SELECT user_id AS "userId", pack_id AS "packId", coins, status FROM payments WHERE id=$1',
+    [paymentId]
+  );
+  return r.rowCount ? r.rows[0] : null;
+}
+
+// Marca como aprovado só UMA vez. Retorna o pagamento se foi aprovado agora.
+async function dbApprovePayment(paymentId) {
+  if (mode === 'memory') {
+    const p = memPayments.get(paymentId);
+    if (p && p.status !== 'approved') {
+      p.status = 'approved';
+      return p;
+    }
+    return null;
+  }
+  const r = await pool.query(
+    `UPDATE payments SET status='approved'
+     WHERE id=$1 AND status<>'approved'
+     RETURNING user_id AS "userId", coins`,
+    [paymentId]
+  );
+  return r.rowCount ? r.rows[0] : null;
+}
+
+module.exports = {
+  initDb,
+  dbGetUser,
+  dbAddCoins,
+  dbSpendCoins,
+  dbSavePayment,
+  dbGetPayment,
+  dbApprovePayment
+};

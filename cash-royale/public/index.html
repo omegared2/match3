@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>💰 Tiago Cash Royale</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{
+    font-family:'Trebuchet MS',Arial,sans-serif;color:#fff;
+    min-height:100vh;display:flex;flex-direction:column;align-items:center;
+    background:radial-gradient(circle at 20% 0%, #2d1b4e, #0f0c29 60%, #000);
+    background-attachment:fixed;user-select:none;text-align:center;
+  }
+  body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:radial-gradient(rgba(255,215,0,0.10) 1px,transparent 1px);background-size:28px 28px;}
+  h1{margin:14px 10px 2px;font-size:26px;letter-spacing:3px;z-index:1;
+    background:linear-gradient(90deg,#ffd700,#ff8c00);-webkit-background-clip:text;background-clip:text;color:transparent;
+    text-shadow:0 0 30px rgba(255,180,0,0.35);}
+  .sub{font-size:12px;opacity:.85;margin-bottom:8px;z-index:1;}
+  #hud{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;z-index:1;margin-bottom:8px;}
+  .pill{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);padding:6px 13px;border-radius:20px;
+    font-weight:bold;font-size:15px;backdrop-filter:blur(4px);}
+  .pill b{color:#ffd700;}
+  .sound{position:fixed;top:10px;right:10px;z-index:40;background:rgba(0,0,0,0.5);border:none;border-radius:12px;padding:6px 10px;font-size:20px;cursor:pointer;}
+
+  .panel{width:min(620px,94vw);background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);
+    border-radius:18px;padding:14px;margin-bottom:12px;backdrop-filter:blur(5px);z-index:1;}
+
+  .row{display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;}
+  input{flex:1;min-width:120px;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.25);
+    background:rgba(0,0,0,0.35);color:#fff;font-size:16px;outline:none;}
+  .btn{border:none;border-radius:12px;padding:12px 18px;font-weight:bold;font-size:15px;cursor:pointer;color:#1a1a2e;
+    background:linear-gradient(135deg,#ffd700,#ff8c00);box-shadow:0 5px 14px rgba(0,0,0,0.4);transition:transform .12s;}
+  .btn:active{transform:scale(0.95);}
+  .btn.ghost{background:rgba(255,255,255,0.14);color:#fff;border:1px solid rgba(255,255,255,0.22);}
+  #joinBtn:disabled{opacity:.55;}
+
+  #status{border-radius:14px;padding:12px;font-size:16px;font-weight:bold;line-height:1.5;}
+  #status .phase-text{display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;}
+  .tag{background:rgba(0,0,0,0.4);border-radius:10px;padding:4px 10px;font-size:13px;display:inline-block;}
+  #countdown{font-size:26px;color:#ffd700;}
+  #pot{font-size:22px;color:#7dff7d;}
+
+  #cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;width:100%;margin-top:10px;}
+  .card{background:linear-gradient(160deg,rgba(255,255,255,0.12),rgba(255,255,255,0.04));
+    border:1px solid rgba(255,255,255,0.2);border-radius:14px;padding:8px 6px 10px;transition:all .3s;}
+  .card.you{border-color:#ffd700;box-shadow:0 0 14px rgba(255,215,0,0.5);}
+  .card.dead{opacity:.4;filter:grayscale(.9);}
+  .card.winner{border-color:#7dff7d;box-shadow:0 0 20px rgba(125,255,125,0.7);transform:scale(1.05);}
+  .card .nick{font-size:13px;font-weight:bold;margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .reels{display:flex;gap:3px;justify-content:center;}
+  .reel{width:26px;height:34px;background:linear-gradient(180deg,#fff,#e8e8e8);color:#222;border-radius:6px;
+    font-weight:bold;font-size:18px;display:flex;align-items:center;justify-content:center;
+    box-shadow:inset 0 -2px 0 rgba(0,0,0,0.2);}
+  .card .sum{margin-top:6px;font-size:14px;color:#ffd700;font-weight:bold;}
+  .card .skull{margin-top:6px;font-size:18px;}
+  .card .crown{margin-top:6px;font-size:20px;}
+
+  #log{max-height:120px;overflow-y:auto;text-align:left;font-size:13px;line-height:1.5;color:#eae6ff;}
+  #log div{padding:2px 0;border-bottom:1px dashed rgba(255,255,255,0.08);}
+
+  h2{font-size:15px;margin:2px 0 8px;color:#ffd700;letter-spacing:2px;}
+
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.88);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:50;padding:20px;backdrop-filter:blur(4px);}
+  .overlay .medal{font-size:80px;animation:bounce 1.1s infinite;}
+  @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+  .overlay h2{font-size:28px;margin:8px 0;letter-spacing:2px;}
+  .confetti{position:absolute;width:9px;height:13px;border-radius:2px;animation:cf 3s linear infinite;opacity:.9;}
+  @keyframes cf{0%{transform:translateY(-30px) rotate(0);opacity:1}100%{transform:translateY(100vh) rotate(720deg);opacity:0}}
+  .spin{animation:spin .5s linear infinite;}
+  @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+
+  .modal{background:#fff;color:#222;border-radius:18px;padding:24px;max-width:340px;width:92vw;text-align:center;box-shadow:0 18px 50px rgba(0,0,0,.5);}
+  .modal h3{margin:0 0 10px;color:#0f0c29;}
+  .modal img{width:185px;height:185px;border:1px solid #ddd;border-radius:8px;margin:0 auto 12px;display:block;}
+  .modal textarea{width:100%;height:76px;font-size:11px;border:1px solid #ccc;border-radius:8px;padding:6px;box-sizing:border-box;}
+  .modal .mrow{display:flex;gap:8px;margin-top:12px;}
+  .modal button{flex:1;padding:11px;border:none;border-radius:9px;color:#fff;font-weight:bold;cursor:pointer;font-size:14px;}
+  .modal button.blue{background:#3483fa;}
+  .modal button.green{background:#2ecc71;}
+  .modal .gray{background:#eee;color:#333;width:100%;margin-top:8px;}
+  .modal p{font-size:14px;margin:0 0 8px;}
+
+  #packs{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;width:100%;}
+  .pack{background:linear-gradient(140deg,#2ecc71,#16a085);border-radius:14px;padding:12px;cursor:pointer;font-weight:bold;box-shadow:0 6px 14px rgba(0,0,0,.4);}
+  .pack:active{transform:scale(.95);}
+  .pack .ico{font-size:30px;} .pack .na{font-size:14px;margin:4px 0;} .pack .pr{font-size:16px;}
+  #msgel{min-height:20px;font-size:14px;margin:8px 0;text-shadow:0 0 6px #000;z-index:1;}
+</style>
+</head>
+<body>
+  <button class="sound" onclick="toggleSound()">🔊</button>
+
+  <h1>💎 TIAGO CASH ROYALE</h1>
+  <div class="sub">Gire a máquina! Quem tirar o menor número cai fora. O último leva o pote! 👑</div>
+
+  <div id="hud">
+    <span class="pill">💰 <b id="coins">-</b></span>
+    <span class="pill">🎰 <b id="rounds">0</b></span>
+    <span class="pill">🏆 Pote: <b id="pot">0</b></span>
+    <button class="btn ghost" onclick="openStore()" style="font-size:12px;padding:8px 12px;">🛒 Comprar moedas</button>
+  </div>
+  <div id="msgel"></div>
+
+  <div class="panel">
+    <div class="row">
+      <input id="nick" maxlength="14" placeholder="Seu nome aqui" value="">
+      <button class="btn" id="joinBtn" onclick="joinArena()">GIRAR AGORA 💰100</button>
+      <button class="btn ghost" id="leaveBtn" onclick="leaveArena()" style="display:none;">🚪 Sair</button>
+    </div>
+    <div id="status" style="margin-top:10px;">
+      <div class="phase-text"><span class="tag" id="phaseTag">Esperando</span><span id="countdown">--</span></div>
+    </div>
+  </div>
+
+  <div class="panel" style="display:none;" id="cardsPanel">
+    <h2>🎮 ARENA AO VIVO</h2>
+    <div id="cards"></div>
+  </div>
+
+  <div class="panel">
+    <h2>📜 ACONTECEU</h2>
+    <div id="log"></div>
+  </div>
+
+  <div class="panel">
+    <h2>💰 PACOTES DE MOEDAS (PIX)</h2>
+    <div id="packs"></div>
+  </div>
+
+  <!-- Vencedor -->
+  <div class="overlay" id="winOverlay">
+    <div class="medal">👑</div>
+    <h2>VOCÊ VENCEU!</h2>
+    <p style="font-size:20px;margin-bottom:10px;">Pote: <b id="winPot">0</b> moedas</p>
+    <div class="row">
+      <button class="btn" onclick="rejoin()">🏆 Jogar de novo</button>
+      <button class="btn ghost" onclick="closeWin()">Fechar</button>
+    </div>
+  </div>
+
+  <!-- Pix -->
+  <div class="overlay" id="pixOverlay">
+    <div class="modal">
+      <h3>Pagamento Pix</h3>
+      <p id="pixInfo"></p>
+      <img id="pixImg" src="" alt="QR Code"/>
+      <p style="font-size:13px;margin:0 0 6px;">ou copie o código:</p>
+      <textarea id="pixCode" readonly></textarea>
+      <div class="mrow">
+        <button class="blue" onclick="copyPix()">Copiar</button>
+        <button class="green" onclick="checkPix()">Já paguei</button>
+      </div>
+      <button class="gray" onclick="closeStore()">Fechar</button>
+      <p id="pixStatus" style="margin:8px 0 0;font-size:13px;color:#333;"></p>
+    </div>
+  </div>
+
+<script>
+const API='';
+let userId = localStorage.getItem('cash_user') || ('p_'+Math.random().toString(36).slice(2,10));
+localStorage.setItem('cash_user', userId);
+let nick = localStorage.getItem('cash_nick') || '';
+document.getElementById('nick').value = nick;
+
+let coins = 0;
+let soundOn = true, audioCtx = null;
+let myStatus = { joined: false };
+let PACKS = [];
+let lastRound = 0;
+
+// ---------------- backend básico ----------------
+function loadCoins(){ fetch(API+'/api/balance/'+userId).then(r=>r.json()).then(d=>{coins=d.balance;showCoins();}).catch(()=>{}); }
+function showCoins(){ document.getElementById('coins').textContent = coins; }
+function addCoins(n){ fetch(API+'/api/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,amount:n})}).then(r=>r.json()).then(d=>{coins=d.balance;showCoins();}).catch(()=>{}); }
+function spendHelper(cost){
+  return fetch(API+'/api/spend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,cost})})
+    .then(r=>r.json()).then(d=>{ if(d.error) return {ok:false}; coins=d.balance; showCoins(); return {ok:true}; })
+    .catch(()=>({offline:true}));
+}
+function loadPacks(){
+  fetch(API+'/api/packs').then(r=>r.json()).then(d=>{
+    PACKS=d;
+    const box=document.getElementById('packs');
+    box.innerHTML='';
+    d.forEach((p,i)=>{
+      const div=document.createElement('div');
+      div.className='pack';
+      div.innerHTML='<div class="ico">'+(['🪙','💰','💎'][i]||'🪙')+'</div><div class="na">'+p.name+'</div><div class="pr">R$ '+p.brl.toFixed(2).replace('.',',')+'</div>';
+      div.onclick=()=>buyPack(p);
+      box.appendChild(div);
+    });
+  }).catch(()=>{});
+}
+
+// ---------------- arena ----------------
+async function joinArena(){
+  nick = document.getElementById('nick').value.trim().slice(0,14) || 'Jogador';
+  localStorage.setItem('cash_nick', nick);
+  const btn=document.getElementById('joinBtn');
+  btn.disabled=true; btn.textContent='Entrando...';
+  try{
+    const r=await fetch(API+'/api/arena/join',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,nick})});
+    const d=await r.json();
+    if(d.error){ msg(d.error); sfxError(); if(d.error.includes('Moedas insuficientes')||d.error.includes('Compre')) openStore(); }
+    else { coins=d.balance; showCoins(); myStatus.joined=true; sfxBuy(); msg('✅ Você está na arena! Boa sorte!'); }
+  }catch(e){ msg('Erro de conexão.'); }
+  btn.disabled=false; btn.textContent='GIRAR AGORA 💰100';
+}
+async function leaveArena(){
+  const r=await fetch(API+'/api/arena/leave',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId})});
+  const d=await r.json();
+  if(d.error){ msg(d.error); } else { coins=d.balance; showCoins(); myStatus.joined=false; msg('Você saiu (entrada devolvida).'); }
+}
+function rejoin(){ closeWin(); joinArena(); }
+
+// Polling do estado da arena
+async function poll(){
+  try{
+    const st=await (await fetch(API+'/api/arena/status')).json();
+    render(st);
+  }catch(e){}
+}
+function render(st){
+  document.getElementById('pot').textContent = st.prizePool;
+  document.getElementById('rounds').textContent = st.round;
+
+  const my = st.players.find(p=>p.id===userId);
+  const btn=document.getElementById('joinBtn');
+  const leaveBtn=document.getElementById('leaveBtn');
+  const inGame = !!my && st.phase!=='waiting';
+  myStatus.joined = !!my;
+  leaveBtn.style.display = (!!my && st.phase==='waiting') ? 'inline-block' : 'none';
+
+  // fase tag / countdown / botão
+  const tag=document.getElementById('phaseTag');
+  let phaseText = st.phase==='waiting' ? '🕐 ARENA ABERTA' : (st.phase==='playing' ? '🎮 ROLANDO' : '👑 FIM');
+  tag.textContent=phaseText;
+  let cd = Math.ceil(st.countdownMs/1000);
+  let cdText;
+  if(st.phase==='waiting'){
+    cdText = st.players.length>=st.minPlayers ? ('⚡ inicia em '+cd+'s') : ('esperando jogadores ('+st.players.length+'/'+st.maxPlayers+')');
+  } else if(st.phase==='playing'){
+    cdText = '⚡ próxima rodada em '+cd+'s';
+  } else { cdText = 'nova arena em '+cd+'s'; }
+  document.getElementById('countdown').textContent=cdText;
+
+  if(!my){
+    document.getElementById('cardsPanel').style.display='none';
+    if(!inGame){ btn.textContent='GIRAR AGORA 💰'+st.fee; }
+  }else{
+    btn.textContent = myStatus.joined ? '✅ VOCÊ ESTÁ NA ARENA' : 'GIRAR AGORA 💰'+st.fee;
+  }
+
+  // cartas
+  const cards=document.getElementById('cards');
+  cards.innerHTML='';
+  st.players.forEach(p=>{
+    const c=document.createElement('div');
+    c.className='card'+(p.id===userId?' you':'')+(p.alive?'':' dead')+((st.phase!=='waiting'&&st.winnerId===p.id)?' winner':'');
+    let middle = '';
+    if(p.alive && st.phase!=='waiting' && p.reels){
+      middle='<div class="reels">'+p.reels.map(v=>'<div class="reel">'+v+'</div>').join('')+'</div><div class="sum">= '+p.sum+'</div>';
+    }else if(!p.alive){
+      middle='<div class="skull">💥 eliminado '+((p.sum!==null)?('· '+p.sum):'')+'</div>';
+    }else if(st.phase!=='waiting' && st.round===0){
+      middle='<div class="skull" style="font-size:16px;">preparando...</div>';
+    }else if(st.winnerId===p.id){
+      middle='<div class="crown">👑 VENCEDOR</div>';
+    }else{
+      middle='<div style="font-size:16px;opacity:.6;">aguardando giro</div>';
+    }
+    c.innerHTML='<div class="nick">'+(p.id===userId?'👉 ':'')+escapeHtml(p.nick)+(p.id===userId?' (você)':'')+'</div>'+middle;
+    cards.appendChild(c);
+  });
+  if(st.players.length>0) document.getElementById('cardsPanel').style.display='block';
+
+  // vencedor overlay (só pro vencedor local)
+  if(st.phase==='result' && st.winnerId===userId){
+    if(!document.getElementById('winOverlay')._shown){
+      document.getElementById('winOverlay')._shown=true;
+      document.getElementById('winPot').textContent=st.prizePool;
+      document.getElementById('winOverlay').style.display='flex';
+      confettiRain();
+      sfxWin();
+      loadCoins();
+    }
+  } else if(st.phase!=='result'){
+    document.getElementById('winOverlay')._shown=false;
+  }
+
+  // log
+  const log=document.getElementById('log');
+  log.innerHTML=st.log.slice(-20).map(l=>'<div>'+escapeHtml(l)+'</div>').join('');
+
+  // novo round -> som
+  if(st.round>lastRound && st.round>=1){ lastRound=st.round; if(st.phase!=='result') sfxSpin(); }
+}
+function closeWin(){ document.getElementById('winOverlay').style.display='none'; }
+function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function confettiRain(){
+  const w=document.getElementById('winOverlay');
+  w.querySelectorAll('.confetti').forEach(c=>c.remove());
+  const cols=['#ffd700','#ff8c00','#7dff7d','#39c0ff','#ff5e8a'];
+  for(let i=0;i<60;i++){
+    const c=document.createElement('div');
+    c.className='confetti';
+    c.style.left=Math.random()*100+'vw';
+    c.style.background=cols[i%cols.length];
+    c.style.animationDelay=(Math.random()*3)+'s';
+    w.appendChild(c);
+  }
+}
+function msg(t){ document.getElementById('msgel').textContent=t; }
+function flashMsg(){ const e=document.getElementById('msgel'); e.style.opacity=1; clearTimeout(e._t); e._t=setTimeout(()=>{e.style.transition='opacity 1s';e.style.opacity=.5;setTimeout(()=>e.style.opacity=1,1000);},2500); }
+
+// ---------------- loja Pix ----------------
+function openStore(){ document.getElementById('pixOverlay').style.display='flex'; document.getElementById('pixStatus').textContent=''; }
+function closeStore(){ if(pixTimer){clearInterval(pixTimer);pixTimer=null;} document.getElementById('pixOverlay').style.display='none'; loadCoins(); }
+function buyPack(p){
+  msg('Gerando QR Code Pix...');
+  fetch(API+'/api/create-pix',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,packId:p.id})})
+    .then(r=>r.json()).then(d=>{
+      if(d.error){ msg(d.error); return; }
+      document.getElementById('pixInfo').textContent=p.name+' — R$ '+p.brl.toFixed(2).replace('.',',')+' = '+p.coins+' moedas';
+      document.getElementById('pixImg').src='data:image/png;base64,'+d.qrCodeBase64;
+      document.getElementById('pixCode').value=d.qrCode;
+      document.getElementById('pixStatus').dataset.pid=d.paymentId;
+      document.getElementById('pixStatus').textContent='';
+      document.getElementById('pixOverlay').style.display='flex';
+    }).catch(()=>msg('Falha ao conectar.'));
+}
+let pixTimer=null;
+function copyPix(){
+  const t=document.getElementById('pixCode');
+  t.select(); navigator.clipboard?.writeText(t.value);
+  document.getElementById('pixStatus').textContent='Código copiado!';
+}
+function checkPix(){
+  const pid=document.getElementById('pixStatus').dataset.pid;
+  if(!pid){ document.getElementById('pixStatus').textContent='Nenhum pagamento gerado ainda.'; return; }
+  const st=document.getElementById('pixStatus');
+  st.textContent='Verificando pagamento...';
+  if(pixTimer){clearInterval(pixTimer);pixTimer=null;}
+  const poll=()=>{
+    fetch(API+'/api/payment-status/'+pid).then(r=>r.json()).then(d=>{
+      if(d.status==='approved'){
+        st.textContent='✅ Pagamento aprovado! +'+d.coins+' moedas';
+        if(pixTimer){clearInterval(pixTimer);pixTimer=null;}
+        loadCoins();
+        setTimeout(()=>closeStore(),1500);
+      }else if(d.status==='pending'){
+        st.textContent='⏳ Aguardando pagamento...';
+      }else{ st.textContent='Status: '+d.status; }
+    }).catch(()=>st.textContent='Erro ao verificar');
+  };
+  poll(); pixTimer=setInterval(poll,4000);
+}
+
+// ---------------- som ----------------
+function getCtx(){ if(!audioCtx){ try{audioCtx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){} } return audioCtx; }
+function tone(fr,dur=.15,type='sine',vol=.2){
+  if(!soundOn)return; const ctx=getCtx(); if(!ctx)return;
+  const o=ctx.createOscillator(),g=ctx.createGain();
+  o.type=type;o.frequency.value=fr;g.gain.value=vol;
+  g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+dur);
+  o.connect(g);g.connect(ctx.destination);o.start();o.stop(ctx.currentTime+dur);
+}
+function sfxSpin(){ for(let i=0;i<6;i++)setTimeout(()=>tone(300+i*80,.09,'square',.12),i*45); }
+function sfxWin(){ for(let i=0;i<8;i++)setTimeout(()=>tone(400+i*130,.18,'triangle',.2),i*120); }
+function sfxBuy(){ tone(500,.1,'sine',.15); setTimeout(()=>tone(800,.15,'sine',.15),90); }
+function sfxError(){ tone(220,.2,'sawtooth',.15); setTimeout(()=>tone(150,.25,'sawtooth',.15),120); }
+function toggleSound(){ soundOn=!soundOn; document.querySelector('.sound').textContent=soundOn?'🔊':'🔇'; if(soundOn)sfxBuy(); }
+
+loadCoins(); loadPacks();
+setInterval(poll,1100); poll();
+</script>
+</body>
+</html>
