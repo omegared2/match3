@@ -479,6 +479,7 @@ function openCharSheet(){
   document.getElementById('sheetBody').innerHTML=
     '<div style="text-align:center;font-size:52px;margin-bottom:6px;">'+p.classIcon+'</div>'+
     '<div style="text-align:center;font-weight:bold;font-size:16px;">'+p.className+'</div>'+
+    '<div style="text-align:center;font-size:12px;color:#9cf;margin-bottom:8px;">🔑 Código do jogador: <b onclick="copyCode()" style="cursor:pointer;color:#ffd700;">'+userId+'</b> (toque p/ copiar)</div>'+
     '<div style="text-align:center;font-size:13px;color:#9cf;margin-bottom:10px;">Fase '+p.phase+' · Nível '+p.level+' · Vitórias '+p.wins+'</div>'+
     '<div class="pf"><div class="hpbar" style="width:100%;"><div class="hpfill" id="shp" style="width:'+Math.max(0,p.hp/p.maxhp*100)+'%"></div></div><div style="font-size:12px;margin-top:3px;">❤️ '+p.hp+'/'+p.maxhp+'</div></div>'+
     '<div style="display:flex;gap:6px;margin:8px 0;flex-wrap:wrap;">'+
@@ -492,6 +493,7 @@ function openCharSheet(){
   document.getElementById('sheOverlay').style.display='flex';
 }
 function nothing(){ flash('Ande até um personagem e toque em 💬 Falar'); }
+function copyCode(){ navigator.clipboard?.writeText(userId).then(()=>flash('Código copiado: '+userId)).catch(()=>flash('Seu código: '+userId)); }
 function toggleSound(){} 
 
 // ---------- PIX ----------
