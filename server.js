@@ -60,7 +60,8 @@ app.post('/api/create-pix', async (req, res) => {
     });
   } catch (err) {
     console.error('Erro ao criar Pix:', err.response?.data || err.message);
-    res.status(500).json({ error: 'Falha ao criar pagamento' });
+    const det = err.response?.data || err.message || '';
+    res.status(500).json({ error: 'Falha ao criar pagamento', det: String(det).slice(0, 400) });
   }
 });
 
@@ -187,6 +188,55 @@ app.post('/api/victory-bonus', async (req, res) => {
   if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
   const r = await db.dbAddCoins(userId, 25);
   res.json({ balance: r.balance, bonus: 25 });
+});
+
+// -------------------------------------------------------
+// Página de colagem: o usuário cola códigos do celular aqui
+// (usada para receber API keys/prints sem digitar no PC)
+// -------------------------------------------------------
+const PASTE_FILE = '/home/tiago/match3-backend/pastes.txt';
+
+app.get('/_paste', (req, res) => {
+  res.send(`<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Colar código</title>
+<style>
+  body{font-family:Arial,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;padding:16px}
+  h2{color:#38bdf8}
+  ol{line-height:1.9}
+  textarea{width:100%;height:130px;font-size:16px;padding:10px;border-radius:8px;border:none;box-sizing:border-box}
+  button{margin-top:12px;font-size:18px;padding:14px 22px;border:none;border-radius:8px;background:#22c55e;color:#fff;font-weight:bold;width:100%}
+  #msg{margin-top:12px;font-weight:bold;min-height:22px}
+</style>
+<h2>📩 Colar código aqui</h2>
+<ol>
+  <li>Abra o Render no navegador e crie a chave (cansei-te do meu menu)</li>
+  <li>Selecione o código e toque em <b>Copiar</b></li>
+  <li>Cole ali em baixo e toque em <b>ENVIAR</b></li>
+</ol>
+<textarea id="cod" placeholder="Cole aqui o código..."></textarea>
+<br>
+<button onclick="env()">ENVIAR</button>
+<div id="msg"></div>
+<script>
+async function env(){
+  var v=document.getElementById('cod').value.trim();
+  var m=document.getElementById('msg');
+  if(!v){m.textContent='Está vazio! Cola o código primeiro.';return}
+  var r=await fetch('/_paste',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({codigo:v})});
+  m.textContent=(r.ok)?'✅ Recebido com sucesso!':'❌ Erro ao enviar';
+}</script>`);
+});
+
+app.post('/_paste', (req, res) => {
+  const v = (req.body && typeof req.body.codigo === 'string') ? req.body.codigo.trim() : '';
+  if (!v || v.length > 5000) return res.sendStatus(400);
+  require('fs').appendFile(PASTE_FILE, v + '\n---FIM---\n', (err) => {
+    if (err) return res.sendStatus(500);
+    console.log('📥 Código colado via página (_paste)');
+    res.sendStatus(200);
+  });
 });
 
 db.initDb().then(() => {
