@@ -271,6 +271,8 @@ app.post('/api/battle/action', async (req, res) => {
     if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
     const r = await rpg.act(db, userId, action || 'attack');
     if (r.error) return res.status(400).json({ error: r.error });
+    if (r.win === true) notifyTelegram(`🏆 BATALHA DO CAVALEIRO: usuário ${userId} venceu a Fase ${r.battle.level}! +${r.battle.reward} moedas (pote do cavaleiro).`);
+    if (r.win === false) notifyTelegram(`💀 BATALHA DO CAVALEIRO: usuário ${userId} caiu na Fase ${r.battle.level} (a entrada ficou com o inimigo).`);
     res.json(r);
   } catch (err) {
     console.error('Erro na batalha:', err.message);
