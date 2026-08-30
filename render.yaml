@@ -11,9 +11,8 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
-      - key: MP_ACCESS_TOKEN APP_USR-2183579624596817-083008-f649747a8c025ebae11fc9f19ba3e0ee-79228648
+      - key: MP_ACCESS_TOKEN
         sync: false
-        value: APP_USR-2183579624596817-083008-f649747a8c025ebae11fc9f19ba3e0ee-79228648
       - key: BASE_URL
         sync: false
       - key: DATABASE_URL
