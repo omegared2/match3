@@ -31,6 +31,66 @@ function packLabel(packId) {
   return pp ? `R$ ${pp.brl.toFixed(2).replace('.', ',')} (${pp.coins} moedas)` : packId || '';
 }
 
+// -------------------------------------------------------
+// Rastreio de renda de anúncios (AdMob) — o app manda cada
+// impressão paga pra cá, a gente acumula e avisa o dono.
+// -------------------------------------------------------
+const adState = {
+  totals: {
+    banner: { imps: 0, revenue: 0 },
+    interstitial: { imps: 0, revenue: 0 },
+    recompensado: { imps: 0, revenue: 0 }
+  },
+  totalRevenue: 0,
+  day: new Date().toISOString().slice(0, 10),
+  dayRevenue: 0,
+  events: [],
+  lastMilestone: 0
+};
+function adTodayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+function adNotifyMilestone() {
+  if (adState.totalRevenue - adState.lastMilestone >= 1) {
+    adState.lastMilestone = adState.totalRevenue;
+    const r = adState.totalRevenue;
+    const b = adState.totals.banner, i = adState.totals.interstitial, rc = adState.totals.recompensado;
+    notifyTelegram(
+      `📈 ANÚNCIOS: R$ ${r.toFixed(2).replace('.', ',')} acumulado!\n` +
+      `🟧 banner ${b.imps} imp · ${b.revenue.toFixed(2).replace('.', ',')}\n` +
+      `🟦 cheio ${i.imps} imp · ${i.revenue.toFixed(2).replace('.', ',')}\n` +
+      `🎁 recompensado ${rc.imps} imp · ${rc.revenue.toFixed(2).replace('.', ',')}\n` +
+      `💰 Hoje: R$ ${adState.dayRevenue.toFixed(2).replace('.', ',')}`
+    );
+  }
+}
+app.post('/api/ad-event', (req, res) => {
+  const { type, valueMicros, currencyCode, networkName } = req.body || {};
+  const t = ['banner', 'interstitial', 'recompensado'].includes(type) ? type : 'outros';
+  const value = Number(valueMicros) || 0;
+  const rev = value / 1e6;
+  adState.totals[t] = adState.totals[t] || { imps: 0, revenue: 0 };
+  adState.totals[t].imps += 1;
+  adState.totals[t].revenue += rev;
+  adState.totalRevenue += rev;
+  if (adTodayKey() !== adState.day) {
+    adState.day = adTodayKey();
+    adState.dayRevenue = 0;
+  }
+  adState.dayRevenue += rev;
+  adState.events.unshift({
+    ts: Date.now(),
+    type: t,
+    value: rev,
+    currency: currencyCode || 'BRL',
+    network: networkName || ''
+  });
+  if (adState.events.length > 200) adState.events.pop();
+  if (rev > 0) console.log(`[ads] ${t} +R$ ${rev.toFixed(4)} (${networkName || '?'}) total R$ ${adState.totalRevenue.toFixed(2)}`);
+  adNotifyMilestone();
+  res.json({ ok: true });
+});
+
 // Para o webhook do Mercado Pago precisamos dos dados brutos (raw body)
 app.use('/api/webhook', express.raw({ type: '*/*' }));
 app.use(express.json());
@@ -367,6 +427,17 @@ app.get('/api/admin/user/:userId', async (req, res) => {
     console.error('Erro admin user:', err.message);
     res.status(500).json({ error: 'Erro ao buscar jogador' });
   }
+});
+
+app.get('/api/admin/ads', (req, res) => {
+  if (!adminKeyOk(req)) return res.status(401).json({ error: 'chave inválida' });
+  res.json({
+    totals: adState.totals,
+    totalRevenue: adState.totalRevenue,
+    day: adState.day,
+    dayRevenue: adState.dayRevenue,
+    events: adState.events.slice(0, 10)
+  });
 });
 
 // -------------------------------------------------------
