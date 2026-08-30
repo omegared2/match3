@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Bingo Diário</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  :root { --bg:#170f2e; --card:#241845; --accent:#ffd700; --good:#2ecc71; }
+  body { font-family:system-ui,sans-serif; background:
+    radial-gradient(1200px 500px at 50% -10%, #3b2466, transparent),
+    var(--bg); color:#fff; min-height:100vh; }
+  header { padding:14px 16px 6px; display:flex; justify-content:space-between; align-items:center; }
+  header h1 { font-size:22px; letter-spacing:1px; }
+  header h1 b { color:var(--accent); }
+  .pill { background:rgba(255,255,255,.1); border-radius:999px; padding:6px 12px; font-size:13px; }
+  .jackpot { text-align:center; padding:10px 16px 4px; }
+  .jackpot .lbl { font-size:12px; color:#a99bcc; letter-spacing:2px; }
+  .jackpot .val { font-size:44px; font-weight:900; color:var(--accent); text-shadow:0 0 25px rgba(255,215,0,.4); }
+  .jackpot .sub { font-size:12px; color:#8b7fb0; }
+  .bar { display:flex; gap:10px; padding:10px 16px; }
+  .btn { flex:1; border:none; border-radius:14px; padding:14px; font-size:16px; font-weight:800; cursor:pointer; }
+  .btn.accent { background:linear-gradient(135deg,#ffd700,#ff9d00); color:#3a2a00; }
+  .btn.gray { background:rgba(255,255,255,.14); color:#fff; }
+  .btn:disabled { opacity:.5; }
+  .dots { padding:4px 16px 12px; display:flex; flex-wrap:wrap; gap:8px; min-height:22px; }
+  .dots span { width:30px; height:30px; border-radius:50%; background:#2b1d52; display:flex;
+    align-items:center; justify-content:center; font-size:12px; font-weight:700; transition:.2s;
+    border:1px solid #3d2f6b; }
+  .dots span.saiu { background:#542bd1; border-color:#7a5cff; color:#fff; box-shadow:0 0 10px rgba(122,92,255,.5); }
+  .dots span.acabou { animation:pop .3s; background:#e74c3c; border-color:#ff6b5b; }
+  @keyframes pop { 50% { transform:scale(1.35); } }
+  .gridwrap { padding:6px 16px; }
+  .grid { display:grid; grid-template-columns:repeat(5,1fr); gap:7px; }
+  .cell { aspect-ratio:1/1; background:#331f5e; border:1px solid #472f80; border-radius:10px;
+    display:flex; align-items:center; justify-content:center; font-size:clamp(12px,3.4vw,20px); font-weight:800; }
+  .cell.centro { background:transparent; border:none; font-size:22px; }
+  .cell.marcada { background:#ffd700; color:#3a2a00; border-color:#ffb300; box-shadow:0 0 14px rgba(255,215,0,.6); }
+  .cell.venceu { animation:pulse 0.5s infinite alternate; }
+  @keyframes pulse { from { box-shadow:0 0 6px #2ecc71; } to { box-shadow:0 0 22px #2ecc71; } }
+  .msg { text-align:center; padding:6px 16px 0; min-height:20px; font-size:14px; color:#b9aae0; }
+  .msg.bom { color:#2ecc71; font-weight:700; }
+  .msg.travado { color:#ff7878; }
+  .log { padding:8px 16px 30px; font-size:12px; color:#8b7fb0; }
+  .log div { padding:2px 0; }
+  .overlay { position:fixed; inset:0; background:rgba(0,0,0,.72); display:none;
+    align-items:center; justify-content:center; flex-direction:column; z-index:20; text-align:center; padding:20px; }
+  .overlay.show { display:flex; }
+  .overlay .bingo { font-size:64px; font-weight:900; color:var(--accent); text-shadow:0 0 40px rgba(255,215,0,.6); }
+  .overlay .val { font-size:28px; color:#fff; margin-top:8px; }
+  .overlay .btn { margin-top:20px; max-width:260px; }
+  .mini { font-size:11px; color:#8b7fb0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎯 <b>BINGO</b></h1>
+  <span class="pill">🟣 Partida <b id="round">0</b> · <span id="count">00:00</span></span>
+</header>
+
+<div class="jackpot">
+  <div class="lbl">🏆 JACKPOT ACUMULADO</div>
+  <div class="val" id="jackpot">0</div>
+  <div class="sub" id="jsub">70% de cada cartela entra no pote</div>
+</div>
+
+<div class="bar">
+  <button class="btn accent" id="btnBuy">🎫 Comprar cartela · <span id="custo">50</span> 🪙</button>
+  <button class="btn gray" id="btnPix">🪙 Moedas <b id="coins">?</b></button>
+</div>
+
+<div class="dots" id="dots"></div>
+
+<div class="msg" id="msg"></div>
+<div class="gridwrap" id="cards"></div>
+<div class="log" id="log"></div>
+
+<div class="overlay" id="overlay">
+  <div class="bingo">🎉 BINGO!</div>
+  <div class="val" id="ovVal"></div>
+  <button class="btn accent" id="btnOk" onclick="document.getElementById('overlay').classList.remove('show')">Continuar jogando</button>
+</div>
+
+<script>
+  const API = (location.origin === 'file://' || location.origin.indexOf('localhost') !== -1) ? 'https://match3-te1c.onrender.com' : '';
+  let userId = localStorage.getItem('match3_user') || ('player_' + Math.random().toString(36).slice(2,10));
+  localStorage.setItem('match3_user', userId);
+  let coins = null;
+  let minha = null;        // {cols, cardId}
+  let ultimaCols = null;
+
+  const $ = id => document.getElementById(id);
+
+  function fmt(n){ return Number(n).toLocaleString('pt-BR'); }
+  function tempo(ms){
+    const s = Math.max(0, Math.ceil(ms/1000));
+    return ('0'+Math.floor(s/60)).slice(-2)+':'+('0'+s%60).slice(-2);
+  }
+
+  function msg(txt, bom){ const el=$('msg'); el.textContent=txt; el.className='msg'+(bom?' bom':''); if(bom) setTimeout(()=>{el.className='msg';},4000); }
+
+  function balance(cb){
+    fetch(API+'/api/balance/'+userId).then(r=>r.json()).then(d=>{ coins=d.balance; $('coins').textContent=fmt(coins); if(cb)cb(); }).catch(()=>{});
+  }
+  function comprar(){
+    msg('Comprando cartela...');
+    fetch(API+'/api/bingo/buy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId, nick: userId})})
+      .then(r=>r.json()).then(d=>{
+        if(d.error){ msg('❌ '+d.error,''); return; }
+        if(d.error) return;
+        minha = { cols: d.cols, cardId: d.cardId };
+        ultimaCols = d.cols;
+        $('jackpot').textContent = fmt(d.jackpot);
+        coins = d.balance; $('coins').textContent = fmt(coins);
+        msg('🎟️ Cartela comprada! Boa sorte!', true);
+        renderCartela();
+        status();
+      }).catch(()=> msg('Sem internet, tenta de novo'));
+  }
+
+  function montarListaDots(drawn, last){
+    const el = $('dots'); el.innerHTML = '';
+    const vis = drawn.slice(-44);
+    vis.forEach(n=>{ const s=document.createElement('span'); s.textContent=n; s.className = (n===last?'saiu acabou':'saiu'); el.appendChild(s); });
+  }
+
+  function renderCartela(){
+    if(!minha) { $('cards').innerHTML='<div class="msg">Compre sua cartela pra entrar na partida 🎫</div>'; return; }
+    const cols = minha.cols;
+    const drawn = new Set(globalDrawn||[]);
+    let html = '<div class="grid">';
+    for(let r=0;r<5;r++){
+      for(let c=0;c<5;c++){
+        const n = cols[c][r];
+        if(n===null){ html+='<div class="cell centro">⭐</div>'; continue; }
+        html += `<div class="cell ${drawn.has(n)?'marcada':''}" id="cell_${n}">${n}</div>`;
+      }
+    }
+    html += '</div>';
+    $('cards').innerHTML = html;
+  }
+  function animarSorteio(antes, depois){
+    // pinta o número que acabou de sair
+    if(depois && depois!==antes){
+      const el = document.getElementById('cell_'+depois);
+      if(el){ el.classList.remove('marcada'); el.classList.add('marcada','acabou'); setTimeout(()=>el.classList.remove('acabou'),500); }
+    }
+  }
+
+  let globalDrawn = [];
+  let globalLast = null;
+
+  function status(){
+    fetch(API+'/api/bingo/status?userId='+encodeURIComponent(userId))
+      .then(r=>r.json()).then(d=>{
+        const antes = globalLast;
+        globalDrawn = d.drawn || [];
+        globalLast = d.drawnLast;
+        $('round').textContent = d.round;
+        $('count').textContent = tempo(d.countdownMs);
+        $('jackpot').textContent = fmt(d.jackpot || 0);
+        $('custo').textContent = d.cardCost;
+        montarListaDots(globalDrawn, globalLast);
+        renderCartela();
+        animarSorteio(antes, globalLast);
+
+        if(d.phase==='winner'){
+          const w = d.lastWinner;
+          if(w){ 
+            $('ovVal').textContent = (w.userId===userId ? 'Sua cartela venceu! +'+fmt(w.amount)+' moedas' : w.nick+' venceu com '+fmt(w.amount)+' moedas');
+            $('overlay').classList.add('show');
+            msg('');
+            balance();
+          }
+        }
+        const log = d.log || [];
+        $('log').innerHTML = log.map(l=>'<div>'+l+'</div>').join('');
+      }).catch(()=>{});
+  }
+
+  $('btnBuy').onclick = comprar;
+  $('btnPix').onclick = ()=>{ location.href = '/'; };
+
+  balance(()=>status());
+  setInterval(status, 1300);
+</script>
+</body>
+</html>

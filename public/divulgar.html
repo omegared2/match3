@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Jogos do Tiago · Entre pra jogar!</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:system-ui,sans-serif; background:
+    radial-gradient(1000px 460px at 50% -10%, #34206e, transparent), #170f2e;
+    color:#fff; min-height:100vh; }
+  .capa { text-align:center; padding:34px 20px 10px; }
+  .capa .logo { font-size:54px; }
+  .capa h1 { font-size:28px; margin-top:8px; }
+  .capa h1 b { color:#ffd700; }
+  .capa p { color:#a99bcc; margin-top:8px; font-size:14px; }
+  .lista { padding:18px; display:grid; gap:12px; }
+  .item { background:linear-gradient(135deg,#241845,#1d1238); border:1px solid #3d2f6b;
+    border-radius:16px; padding:14px 16px; display:flex; gap:12px; align-items:center; }
+  .item .i { font-size:28px; width:46px; height:46px; border-radius:12px; display:flex;
+    align-items:center; justify-content:center; background:rgba(255,255,255,.08); flex-shrink:0; }
+  .item .t { font-weight:800; font-size:15px; }
+  .item .d { font-size:12px; color:#8b7fb0; margin-top:2px; }
+  .cta { padding:10px 20px 24px; display:grid; gap:10px; }
+  button { border:none; border-radius:999px; padding:15px; font-size:16px; font-weight:800; cursor:pointer; }
+  .cta .play { background:linear-gradient(135deg,#ffd700,#ff9d00); color:#3a2a00; }
+  .cta .copy { background:rgba(255,255,255,.12); color:#fff; }
+  .msg { text-align:center; color:#2ecc71; font-size:12px; min-height:16px; }
+</style>
+</head>
+<body>
+<div class="capa">
+  <div class="logo">🎮💰</div>
+  <h1>Jogos do <b>Tiago</b></h1>
+  <p>4 jogos, 1 carteira de moedas. Compre uma vez (Pix) e jogue tudo.<br/>Bônus diário, sorteios e potes acumulando!</p>
+</div>
+<div class="lista">
+  <div class="item"><div class="i">🍭</div><div><div class="t">Match-3</div><div class="d">O clássico de combinar doces</div></div></div>
+  <div class="item"><div class="i">🎰</div><div><div class="t">Cash Royale</div><div class="d">Caça-níqueis battle royale: o último que sobra leva tudo</div></div></div>
+  <div class="item"><div class="i">⚔️</div><div><div class="t">Batalha do Cavaleiro</div><div class="d">RPG aberto com NPCs e chefes</div></div></div>
+  <div class="item"><div class="i">🎯</div><div><div class="t">Bingo Diário</div><div class="d">Cartela barata e pote que só cresce</div></div></div>
+</div>
+<div class="cta">
+  <button class="play" onclick="abrir()">🎮 JOGAR AGORA</button>
+  <button class="copy" onclick="copiar()">🔗 Copiar link pra compartilhar</button>
+  <div class="msg" id="msg"></div>
+</div>
+<script>
+function abrir(){ location.href = '/jogos'; }
+function copiar(){
+  const link = location.href;
+  navigator.clipboard.writeText('🎮 Entra pra jogar! Match-3, Cash Royale, Batalha do Cavaleiro e Bingo com pote acumulando. Tudo com Pix! ' + link)
+    .then(()=>{ const m=document.getElementById('msg'); m.textContent='Copiado! Bora espalhar nos grupos 😉'; setTimeout(()=>m.textContent='',3000); });
+}
+</script>
+</body>
+</html>

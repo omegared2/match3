@@ -6,6 +6,7 @@ const pix = require('./pix');
 const db = require('./db');
 const arena = require('./arena');
 const rpg = require('./rpg');
+const bingo = require('./bingo');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -107,6 +108,9 @@ app.use('/royale', express.static(path.join(__dirname, 'cash-royale', 'public'))
 // Batalha do Cavaleiro (mundo aberto)
 app.get('/batalha', (req, res) => res.sendFile(path.join(__dirname, 'public', 'aventura.html')));
 app.get('/aventura', (req, res) => res.sendFile(path.join(__dirname, 'public', 'aventura.html')));
+app.get('/jogos', (req, res) => res.sendFile(path.join(__dirname, 'public', 'jogos.html')));
+app.get('/bingo', (req, res) => res.sendFile(path.join(__dirname, 'public', 'bingo.html')));
+app.get('/divulgar', (req, res) => res.sendFile(path.join(__dirname, 'public', 'divulgar.html')));
 
 // -------------------------------------------------------
 // PACKS: pacotes de moedas vendidos via Pix
@@ -302,6 +306,32 @@ app.post('/api/arena/leave', async (req, res) => {
 });
 
 // -------------------------------------------------------
+// 8.5) BINGO DIÁRIO (jackpot acumulativo)
+// -------------------------------------------------------
+app.get('/api/bingo/status', (req, res) => {
+  res.json(bingo.status(String(req.query.userId || '')));
+});
+
+app.post('/api/bingo/buy', async (req, res) => {
+  try {
+    const { userId, nick } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
+    const r = await bingo.buyCard(db, userId, nick);
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    console.error('Erro ao comprar cartela:', err.message);
+    res.status(500).json({ error: 'Erro ao comprar cartela' });
+  }
+});
+
+app.get('/api/admin/bingo', (req, res) => {
+  if (!adminKeyOk(req)) return res.status(401).json({ error: 'chave inválida' });
+  const s = bingo.status();
+  res.json({ round: s.round, jackpot: s.jackpot, cardsSold: s.cardsSold, players: s.players, stats: s.stats });
+});
+
+// -------------------------------------------------------
 // 9) MUNDO DO CAVALEIRO (RPG com mapa, NPCs e classes)
 // -------------------------------------------------------
 app.get('/api/char/:userId', async (req, res) => {
@@ -453,6 +483,14 @@ app.post('/api/victory-bonus', async (req, res) => {
 
 db.initDb().then(() => {
   arena.startLoop(db);
+  bingo.startLoop(db);
+  bingo.onEvent = (ev, info) => {
+    if (ev === 'jackpot') {
+      notifyTelegram(`🏆 BINGO! ${info.nick} levou ${info.amount} moedas no jackpot!`);
+    } else if (ev === 'milestone') {
+      notifyTelegram(`📈 BINGO: o pote chegou a ${info.jackpot} moedas!`);
+    }
+  };
   app.listen(PORT, () => {
     console.log(`✅ Servidor rodando em http://localhost:${PORT}`);
     console.log(`   Jogo servido de: ${GAME_DIR}`);
