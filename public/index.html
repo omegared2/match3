@@ -3,36 +3,88 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Match-3 - Loja R$</title>
+<title>⭐ Match-3 - Desafio das Fases</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  :root { --accent:#fdbb2d; }
   body {
-    font-family: Arial, sans-serif;
-    background: radial-gradient(circle at 20% 20%, #1a2a6c, #3a0ca3 60%, #6a0dad);
+    font-family: 'Trebuchet MS', Arial, sans-serif;
     min-height: 100vh;
+    background: radial-gradient(circle at 20% 10%, #1d2b64, #3a0ca3 55%, #6a0dad);
+    background-attachment: fixed;
+    background-size: cover;
     display: flex; flex-direction: column; align-items: center;
     color:#fff; user-select:none; overflow-x:hidden;
+    transition: background 0.8s;
   }
-  h1 { margin:10px 0 6px; letter-spacing:2px; text-shadow:0 0 12px #fdbb2d; }
-  #hud { display:flex; align-items:center; gap:14px; margin:6px 0 8px; font-weight:bold; font-size:17px; flex-wrap:wrap; justify-content:center; }
-  .pill { background:rgba(255,255,255,0.15); padding:6px 14px; border-radius:20px; display:flex; align-items:center; gap:6px; }
-  #grid { display:grid; gap:4px; padding:8px; background:rgba(255,255,255,0.08); border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,0.6); touch-action:none; }
-  .cell { width:42px; height:42px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:28px; cursor:pointer; box-shadow:inset 0 -4px 0 rgba(0,0,0,0.25),0 2px 6px rgba(0,0,0,0.3); }
-  .cell.selected { transform:scale(0.88); box-shadow:0 0 0 3px #fdbb2d,0 0 18px #fdbb2d; }
-  @keyframes explode { 0%{transform:scale(1);opacity:1;} 100%{transform:scale(2);opacity:0;} }
-  .exploding { animation:explode 0.4s forwards; }
-  @keyframes pop { 0%{transform:scale(0);} 60%{transform:scale(1.3);} 100%{transform:scale(1);} }
-  .pop { animation:pop 0.35s ease; }
-  @keyframes fall { 0%{transform:translateY(-34px);opacity:.3;} 100%{transform:translateY(0);opacity:1;} }
-  .fall { animation:fall .35s ease-out; }
-  @media (max-width:430px){ .cell{width:34px;height:34px;font-size:23px;border-radius:8px;} #grid{grid-template-columns:repeat(8,34px)!important;} }
-  @media (max-width:340px){ .cell{width:30px;height:30px;font-size:20px;border-radius:7px;} #grid{grid-template-columns:repeat(8,30px)!important;} }
-  #msg { margin-top:8px; min-height:20px; font-size:14px; text-align:center; text-shadow:1px 1px 3px #000; padding:0 10px; }
+  body::before {
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background: radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px);
+    background-size: 26px 26px;
+  }
 
-  h2 { margin:14px 0 4px; font-size:17px; text-shadow:0 0 8px #fdbb2d; }
+  h1 { margin:12px 0 4px; letter-spacing:3px; font-size:26px; text-shadow:0 0 16px var(--accent); z-index:1; }
+  h2 { margin:14px 0 4px; font-size:17px; text-shadow:0 0 10px var(--accent); z-index:1; }
+
+  #hud, #ghud { display:flex; align-items:center; gap:10px; margin:6px 0 10px; font-weight:bold; font-size:15px; flex-wrap:wrap; justify-content:center; z-index:1; }
+  .pill { background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.18); padding:6px 13px; border-radius:20px; display:flex; align-items:center; gap:6px; backdrop-filter:blur(4px); }
+  .pill b { color:var(--accent); }
+
+  .screen { width:100%; display:flex; flex-direction:column; align-items:center; z-index:1; }
+
+  /* ---------- Mapa de fases ---------- */
+  #levelMap { display:grid; grid-template-columns:repeat(3,minmax(96px,120px)); gap:12px; padding:14px; justify-content:center; width:100%; max-width:460px; }
+  .lvl {
+    position:relative; border-radius:18px; padding:14px 8px; text-align:center; cursor:pointer;
+    background:linear-gradient(150deg, rgba(255,255,255,0.16), rgba(255,255,255,0.05));
+    border:2px solid rgba(255,255,255,0.22); backdrop-filter:blur(5px);
+    box-shadow:0 8px 20px rgba(0,0,0,0.45); transition:transform .15s;
+  }
+  .lvl:active { transform:scale(0.94); }
+  .lvl .num { font-size:24px; font-weight:bold; color:var(--accent); text-shadow:0 0 12px var(--accent); }
+  .lvl .name { font-size:12px; opacity:0.95; margin-top:2px; }
+  .lvl .cost { font-size:12px; margin-top:6px; background:rgba(0,0,0,0.4); border-radius:12px; padding:3px 8px; display:inline-block; }
+  .lvl .stars { font-size:13px; margin-top:4px; letter-spacing:2px; }
+  .lvl.locked { opacity:0.55; filter:grayscale(0.8); }
+  .lvl.locked .num::after { content:' 🔒'; font-size:15px; }
+  .lvl.done { border-color:var(--accent); }
+
+  /* ---------- Jogo ---------- */
+  #boardWrap { background:rgba(0,0,0,0.30); padding:10px; border-radius:22px; border:2px solid rgba(255,255,255,0.14); box-shadow:0 14px 40px rgba(0,0,0,0.6), inset 0 0 30px rgba(255,255,255,0.06); }
+  #grid { display:grid; gap:5px; touch-action:none; }
+  .candy {
+    width:var(--cs); height:var(--cs); border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; position:relative;
+    box-shadow: inset 0 -5px 0 rgba(0,0,0,0.28), inset 0 3px 4px rgba(255,255,255,0.35), 0 4px 10px rgba(0,0,0,0.35);
+    transition: transform .08s;
+  }
+  .candy::after {
+    content:''; position:absolute; top:12%; left:18%; width:34%; height:22%;
+    border-radius:50%; background:rgba(255,255,255,0.65); filter:blur(2px); transform:rotate(-18deg);
+  }
+  .candy:active { transform:scale(0.9); }
+  .candy.selected { transform:scale(0.86); box-shadow:0 0 0 3px var(--accent), 0 0 22px var(--accent); }
+
+  @keyframes explode { 0%{transform:scale(1);opacity:1;filter:brightness(2);} 100%{transform:scale(1.9);opacity:0;} }
+  .exploding { animation:explode 0.4s forwards; }
+  @keyframes pop { 0%{transform:scale(0);} 60%{transform:scale(1.28);} 100%{transform:scale(1);} }
+  .pop { animation:pop 0.32s ease; }
+  @keyframes fall { 0%{transform:translateY(-38px);opacity:.2;} 100%{transform:translateY(0);opacity:1;} }
+  .fall { animation:fall .35s ease-out; }
+  @keyframes shake { 0%,100%{transform:translateX(0);} 20%{transform:translateX(-9px);} 40%{transform:translateX(9px);} 60%{transform:translateX(-6px);} 80%{transform:translateX(6px);} }
+  .shaking { animation:shake 0.4s; }
+
+  .floatScore {
+    position:fixed; font-weight:bold; font-size:22px; color:#fff; text-shadow:0 0 10px var(--accent), 0 2px 4px #000; z-index:30; pointer-events:none;
+    animation:floatUp 1s forwards;
+  }
+  @keyframes floatUp { 0%{transform:translate(-50%,0) scale(0.6);opacity:0;} 20%{opacity:1;} 100%{transform:translate(-50%,-90px) scale(1.25);opacity:0;} }
+
+  /* ---------- Moedas/loja ---------- */
   #packs, #shop { width:100%; max-width:560px; display:grid; gap:10px; padding:0 12px; }
-  #packs { grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); margin-bottom:14px; }
-  #shop { grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); }
+  #packs { grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); margin-bottom:14px; }
+  #shop { grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); }
   .item { background:linear-gradient(140deg,#fdbb2d,#b21f1f); border-radius:14px; padding:12px; text-align:center; cursor:pointer; box-shadow:0 6px 14px rgba(0,0,0,0.4); transition:transform 0.15s; }
   .item:active { transform:scale(0.95); }
   .item.pack { background:linear-gradient(140deg,#2ecc71,#16a085); }
@@ -40,79 +92,210 @@
   .item .name { font-weight:bold; font-size:14px; margin:4px 0 2px; }
   .item .price { font-size:15px; font-weight:bold; background:rgba(0,0,0,0.3); border-radius:12px; padding:3px 10px; display:inline-block; margin-top:4px; }
   .item .stock { font-size:11px; margin-top:4px; opacity:0.9; }
-  .btn { padding:8px 16px; border:none; border-radius:10px; cursor:pointer; font-weight:bold; font-size:15px; background:#fdbb2d; color:#333; }
-  .btn:active{transform:scale(0.95);}
-  #win {
-    position:fixed; inset:0; background:rgba(0,0,0,0.85);
-    display:none; flex-direction:column; align-items:center; justify-content:center;
-    z-index:50; text-align:center; padding:20px;
-    animation:fadeIn 0.5s;
-  }
-  @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
-  #win .big { font-size:70px; animation:bounce 1s infinite; }
-  @keyframes bounce{0%,100%{transform:translateY(0);}50%{transform:translateY(-15px);}}
-  #win h2 { font-size:36px; margin:8px 0; text-shadow:0 0 20px #fdbb2d; letter-spacing:2px; }
-  #win .confetti { position:absolute; width:10px; height:14px; animation:fall 3s linear infinite; opacity:0.9; }
-  @keyframes fall{0%{transform:translateY(-20px) rotate(0);opacity:1;}100%{transform:translateY(100vh) rotate(720deg);opacity:0;}}
-  .sound-toggle { position:fixed; top:10px; right:10px; z-index:40; background:rgba(0,0,0,0.4); border:none; border-radius:10px; padding:6px 10px; font-size:20px; cursor:pointer; }
+
+  .btn { padding:8px 16px; border:none; border-radius:12px; cursor:pointer; font-weight:bold; font-size:15px; background:var(--accent); color:#1a1a2e; box-shadow:0 4px 12px rgba(0,0,0,0.35); }
+  .btn:active { transform:scale(0.95); }
+  .btn.ghost { background:rgba(255,255,255,0.16); color:#fff; border:1px solid rgba(255,255,255,0.25); }
+
+  #progress { width:min(560px,92vw); height:14px; border-radius:10px; background:rgba(0,0,0,0.4); overflow:hidden; margin:6px 0; border:1px solid rgba(255,255,255,0.15); }
+  #progressFill { height:100%; width:0%; background:linear-gradient(90deg, var(--accent), #ff5e62); transition:width .3s; border-radius:10px; }
+
+  /* ---------- Overlays ---------- */
+  .overlay { position:fixed; inset:0; background:rgba(0,0,0,0.85); display:none; flex-direction:column; align-items:center; justify-content:center; z-index:50; text-align:center; padding:20px; animation:fadeIn 0.4s; backdrop-filter:blur(4px); }
+  @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
+  .overlay .big { font-size:64px; animation:bounce 1s infinite; }
+  @keyframes bounce { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-14px);} }
+  .overlay h2 { font-size:32px; margin:8px 0; letter-spacing:2px; }
+  .overlay p { font-size:16px; margin-bottom:14px; line-height:1.5; }
+  .confetti { position:absolute; width:10px; height:14px; animation:confFall 3s linear infinite; opacity:0.9; border-radius:2px; }
+  @keyframes confFall { 0%{transform:translateY(-24px) rotate(0);opacity:1;} 100%{transform:translateY(100vh) rotate(720deg);opacity:0;} }
+
+  .modal { background:#fff; color:#222; border-radius:18px; padding:26px; max-width:340px; width:92vw; text-align:center; animation:fadeIn .3s; }
+  .modal h3 { margin:0 0 10px; color:#1a1a2e; }
+  .modal textarea { width:100%; height:80px; font-size:11px; border:1px solid #ccc; border-radius:8px; padding:6px; box-sizing:border-box; }
+  .modal .mrow { display:flex; gap:8px; margin-top:12px; }
+  .modal button { flex:1; padding:11px; border:none; border-radius:9px; color:#fff; font-weight:bold; cursor:pointer; font-size:14px; }
+  .modal button.blue { background:#3483fa; }
+  .modal button.green { background:#2ecc71; }
+  .modal .gray { background:#eee; color:#333; width:100%; margin-top:8px; }
+  .modal img { width:190px; height:190px; border:1px solid #ddd; border-radius:8px; margin:0 auto 12px; display:block; }
+
+  .sound-toggle { position:fixed; top:10px; right:10px; z-index:40; background:rgba(0,0,0,0.4); border:none; border-radius:12px; padding:6px 10px; font-size:20px; cursor:pointer; }
+  #msg { margin-top:10px; min-height:20px; font-size:14px; text-align:center; text-shadow:1px 1px 3px #000; padding:0 12px; z-index:2; }
+  button.link { background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;text-decoration:underline; }
 </style>
 </head>
 <body>
   <button class="sound-toggle" id="soundBtn" onclick="toggleSound()">🔊</button>
-  <h1>⭐ MATCH-3 ⭐</h1>
-<div id="hud">
-  <span class="pill">💰 Moedas: <b id="coins">100</b></span>
-  <span class="pill">🏆 <b id="score">0</b></span>
-  <button class="btn" onclick="newGame()">Novo Jogo</button>
-</div>
-<div id="grid"></div>
-<div id="msg">Troque peças para combinar 3+! Compre moedas e vantagens!</div>
 
-<h2>💰 PACOTES DE MOEDAS (R$)</h2>
-<div id="packs"></div>
+  <!-- ===== TELA MENU / FASES ===== -->
+  <div class="screen" id="screenMenu">
+    <h1>⭐ MATCH-3 ⭐</h1>
+    <div id="hud">
+      <span class="pill">💰 <b id="coins">-</b></span>
+      <button class="btn ghost" onclick="renderStartGame()">▶ Jogar</button>
+    </div>
+    <h2>🗺️ ESCOLHA A FASE</h2>
+    <div id="levelMap"></div>
+    <h2>💰 PACOTES DE MOEDAS (PIX)</h2>
+    <div id="packs"></div>
+    <h2>🛒 LOJA DE VANTAGENS</h2>
+    <div id="shop"></div>
+  </div>
 
-<h2>🛒 LOJA DE VANTAGENS</h2>
-<div id="shop"></div>
+  <!-- ===== TELA JOGO ===== -->
+  <div class="screen" id="screenGame" style="display:none;">
+    <h1 style="font-size:20px;">FASE <span id="lvlNum">1</span></h1>
+    <div id="ghud">
+      <span class="pill">🎯 <b id="score">0</b>/<span id="target">0</span></span>
+      <span class="pill">👣 <b id="moves">0</b></span>
+      <span class="pill">💰 <b id="gcoins">0</b></span>
+    </div>
+    <div id="progress"><div id="progressFill"></div></div>
+    <div id="boardWrap"><div id="grid"></div></div>
+    <div id="boostbar"></div>
+    <div id="msg"></div>
+    <div style="display:flex;gap:10px;margin-top:10px;">
+      <button class="btn ghost" onclick="openShopModal()">🛒 Loja</button>
+      <button class="btn ghost" onclick="backToMenu()">↩ Sair</button>
+    </div>
+  </div>
 
-<div id="win">
-  <div class="big">🏆</div>
-  <h2>VITÓRIA!</h2>
-  <p style="font-size:20px;margin-bottom:8px;">Você alcançou 10.000 pontos!</p>
-  <p style="font-size:16px;margin-bottom:20px;">Pontuação: <b id="winScore">0</b> • Moedas: <b id="winCoins">0</b></p>
-  <button class="btn" style="font-size:18px;padding:12px 30px;" onclick="closeWin();newGame();">Jogar novamente 🎮</button>
-</div>
+  <!-- ===== VITÓRIA ===== -->
+  <div class="overlay" id="winOverlay">
+    <div class="big">🏆</div>
+    <h2>FASE CONCLUÍDA!</h2>
+    <p><span id="winStars" style="font-size:26px;letter-spacing:4px;"></span><br>
+    Pontos: <b id="winScore"></b> • Moedas ganhas: <b id="winBonus"></b></p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+      <button class="btn" style="font-size:16px;padding:12px 22px;" onclick="nextLevel()">Próxima fase ▶</button>
+      <button class="btn ghost" onclick="backToMenu()">Mapa 🗺️</button>
+    </div>
+  </div>
+
+  <!-- ===== DERROTA ===== -->
+  <div class="overlay" id="loseOverlay">
+    <div class="big">😵</div>
+    <h2>FALTARAM MOVIMENTOS!</h2>
+    <p>Quase lá! Pontos: <b id="loseScore"></b> de <b id="loseTarget"></b></p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+      <button class="btn" onclick="retryLevel()">🔄 Tentar de novo</button>
+      <button class="btn ghost" onclick="backToMenu()">Mapa 🗺️</button>
+    </div>
+  </div>
+
+  <!-- ===== PIX ===== -->
+  <div class="overlay" id="pixOverlay">
+    <div class="modal">
+      <h3>Pagamento Pix</h3>
+      <p id="pixInfo" style="font-size:15px;margin:0 0 10px;"></p>
+      <img id="pixImg" src="" alt="QR Code"/>
+      <p style="font-size:13px;margin:0 0 8px;">ou copie o código:</p>
+      <textarea id="pixCode" readonly></textarea>
+      <div class="mrow">
+        <button class="blue" onclick="copyPix()">Copiar</button>
+        <button class="green" onclick="checkPix()">Já paguei</button>
+      </div>
+      <button class="gray" onclick="closePix()">Fechar</button>
+      <p id="pixStatus" style="margin:8px 0 0;font-size:13px;color:#333;"></p>
+    </div>
+  </div>
 
 <script>
-const COLS=8, ROWS=8;
-const TYPES=['🍎','🍋','🍇','🔵','🟣','🟠'];
-const gridEl=document.getElementById('grid');
-const msgEl=document.getElementById('msg');
-const scoreEl=document.getElementById('score');
-const coinsEl=document.getElementById('coins');
-let grid=[], score=0, coins=100, selected=null, pendingBoost=null, animating=false;
-let soundOn=true, audioCtx=null, won=false;
-const WIN_TARGET=10000;
+// ============================================================
+//  CONFIGURAÇÃO DAS FASES
+// ============================================================
+const CANDY_GRADS = [
+  'radial-gradient(circle at 32% 28%, #ffb3b8, #ff5e62 68%, #c62828)',
+  'radial-gradient(circle at 32% 28%, #fff3b0, #ffd54f 68%, #f9a825)',
+  'radial-gradient(circle at 32% 28%, #b7f7c9, #4caf50 68%, #1b5e20)',
+  'radial-gradient(circle at 32% 28%, #9adcff, #29b6f6 68%, #0277bd)',
+  'radial-gradient(circle at 32% 28%, #e3d0ff, #ab47bc 68%, #6a1b9a)',
+  'radial-gradient(circle at 32% 28%, #ffd0a8, #fb8c00 68%, #bf360c)',
+  'radial-gradient(circle at 32% 28%, #ffc2dd, #ec407a 68%, #ad1457)',
+  'radial-gradient(circle at 32% 28%, #a4f4f0, #26c6da 68%, #00695c)'
+];
 
-// ===== BACKEND PIX (Mercado Pago) =====
-const API=''; // backend mesmo domínio (Express serve o jogo + API)
+const THEMES = {
+  campo:  { bg:'radial-gradient(circle at 20% 10%, #065535, #2e8b57 55%, #043927)', accent:'#7CFC00' },
+  praia:  { bg:'radial-gradient(circle at 20% 10%, #0d7fa8, #22a7f0 55%, #7a4419)', accent:'#ffe066' },
+  noite:  { bg:'radial-gradient(circle at 20% 10%, #1d2b64, #3a0ca3 55%, #6a0dad)', accent:'#fdbb2d' },
+  fogo:   { bg:'radial-gradient(circle at 20% 10%, #4a0e0e, #c0392b 55%, #520000)', accent:'#ff8a5c' },
+  gelo:   { bg:'radial-gradient(circle at 20% 10%, #0f3b5e, #2a7ba5 55%, #0b2545)', accent:'#e0f7ff' },
+  magia:  { bg:'radial-gradient(circle at 20% 10%, #2b1055, #7597de 50%, #3b115f)', accent:'#d4a5ff' },
+  floresta:{bg:'radial-gradient(circle at 20% 10%, #0b3d0b, #145a1f 55%, #052c05)', accent:'#9be564' },
+  espaco: { bg:'radial-gradient(circle at 20% 10%, #0d0d2b, #1a1a3e 55%, #000020)', accent:'#66e0ff' },
+  ouro:   { bg:'radial-gradient(circle at 20% 10%, #3a2a00, #8a6d00 55%, #221800)', accent:'#ffd966' },
+  lava:   { bg:'radial-gradient(circle at 20% 10%, #1a0000, #5c0000 55%, #120000)', accent:'#ff9040' },
+  neon:   { bg:'radial-gradient(circle at 20% 10%, #0f2027, #203a43 55%, #2c5364)', accent:'#39ff14' },
+  royal:  { bg:'radial-gradient(circle at 20% 10%, #3a0d5e, #7b2ff7 55%, #1a0540)', accent:'#ffd700' }
+};
+
+// id, nome, colunas, linhas, qtd tipos, pontuação, movimentos, custo moedas, tema
+const LEVELS = [
+  { id:1,  name:'Campo Docinho',  cols:7, rows:7, types:4, target:600,  moves:20, fee:20,  theme:'campo'  },
+  { id:2,  name:'Praia Doce',     cols:8, rows:8, types:5, target:900,  moves:20, fee:25,  theme:'praia'  },
+  { id:3,  name:'Noite Estrelada',cols:8, rows:8, types:5, target:1200, moves:18, fee:30,  theme:'noite'  },
+  { id:4,  name:'Vulcão Aceso',   cols:9, rows:9, types:5, target:1500, moves:18, fee:35,  theme:'fogo'   },
+  { id:5,  name:'Geleira Azul',   cols:8, rows:8, types:6, target:1800, moves:17, fee:40,  theme:'gelo'   },
+  { id:6,  name:'Torre da Magia', cols:9, rows:9, types:6, target:2200, moves:16, fee:50,  theme:'magia'  },
+  { id:7,  name:'Floresta Profunda',cols:8,rows:8, types:6, target:2600, moves:15, fee:60,  theme:'floresta'},
+  { id:8,  name:'Galáxia',        cols:9, rows:9, types:6, target:3000, moves:15, fee:75,  theme:'espaco' },
+  { id:9,  name:'Minas do Ouro',  cols:8, rows:8, types:7, target:3500, moves:14, fee:90,  theme:'ouro'   },
+  { id:10, name:'Caverna de Lava',cols:9, rows:9, types:7, target:4500, moves:14, fee:120, theme:'lava'   },
+  { id:11, name:'Cidade Neon',    cols:8, rows:8, types:7, target:6000, moves:13, fee:150, theme:'neon'   },
+  { id:12, name:'Trono Real',     cols:9, rows:9, types:8, target:8000, moves:13, fee:200, theme:'royal'  }
+];
+
+// ============================================================
+//  ESTADO
+// ============================================================
+const gridEl = document.getElementById('grid');
+const msgEl  = document.getElementById('msg');
+let COLS=8, ROWS=8, TYPES=6, TARGET=1000, MOVES=20, FEE=20;
+let grid=[], score=0, coins=100, movesLeft=0, selected=null, pendingBoost=null, animating=false;
+let soundOn=true, audioCtx=null, finished=false;
+
+const API='';
 let userId = localStorage.getItem('match3_user') || ('player_'+Math.random().toString(36).slice(2,10));
 localStorage.setItem('match3_user', userId);
 
-// Pacotes em reais - preços vêm do backend
-let PACKS=[
-  {id:'p1', icon:'🪙', name:'Carregando...', brl:'R$ 1,00', coins:100}
-];
-
+let PACKS=[{id:'p1', icon:'🪙', name:'Carregando...', brl:'R$ 1,00', coins:100}];
 const inventory={ bomb:0, swapAll:0, wild:0, bonus:0 };
-
 const SHOP=[
-  {id:'bomb',    icon:'💣', name:'Bomba',        price:150, desc:'Toque numa peça para explodir a área'},
-  {id:'swapAll', icon:'🔀', name:'Reembaralhar', price:80,  desc:'Baralha todas as peças'},
-  {id:'wild',    icon:'✨', name:'Coringa',      price:200, desc:'Vira qualquer peça em outra'},
-  {id:'bonus',   icon:'🏅', name:'+500 pontos',  price:120, desc:'Ganhe pontos imediatos'}
+  {id:'bomb',    icon:'💣', name:'Bomba',        price:150, desc:'Estoura uma área de peças'},
+  {id:'swapAll', icon:'🔀', name:'Reembaralhar', price:80,  desc:'Mistura todas as peças'},
+  {id:'wild',    icon:'✨', name:'Coringa',      price:200, desc:'Transforma uma peça em outra'},
+  {id:'bonus',   icon:'🏅', name:'+500 pontos',  price:120, desc:'Pontos imediatos no jogo'}
 ];
 
-function renderPacks(){
+// progresso: {unlocked: n, stars: {faseId: n}}
+let progress = { unlocked:1, stars:{} };
+try { progress = Object.assign({unlocked:1,stars:{}}, JSON.parse(localStorage.getItem('match3_progress'))||{}); } catch(e){}
+
+// ============================================================
+//  MENU / FASES
+// ============================================================
+function refreshProgress(){ localStorage.setItem('match3_progress', JSON.stringify(progress)); }
+
+function renderLevelMap(){
+  const map=document.getElementById('levelMap');
+  map.innerHTML='';
+  LEVELS.forEach(L=>{
+    const locked = L.id > progress.unlocked;
+    const stars = progress.stars[L.id]||0;
+    const div=document.createElement('div');
+    div.className='lvl'+(locked?' locked':'')+(stars>0?' done':'');
+    div.innerHTML=`<div class="num">${L.id}</div>
+      <div class="name">${L.name}</div>
+      <div class="cost">💰 ${L.fee}</div>
+      <div class="stars">${'⭐'.repeat(stars)}${'☆'.repeat(3-stars)}</div>`;
+    div.onclick=()=>{ if(locked){ msgEl.textContent='🔒 Complete a fase anterior para liberar!'; flashMsg(); return; } playLevel(L); };
+    map.appendChild(div);
+  });
+}
+
+function renderPacks(){ // done em renderStartGame
   const packs=document.getElementById('packs');
   packs.innerHTML='';
   PACKS.forEach(p=>{
@@ -123,134 +306,149 @@ function renderPacks(){
     packs.appendChild(div);
   });
 }
-
 function renderShop(){
   const shop=document.getElementById('shop');
   shop.innerHTML='';
   SHOP.forEach(it=>{
     const div=document.createElement('div');
     div.className='item';
-    div.innerHTML=`<div class="icon">${it.icon}</div><div class="name">${it.name}</div><div class="price">💰 ${it.price}</div><div class="stock">na mochila: ${inventory[it.id]}</div>`;
+    div.innerHTML=`<div class="icon">${it.icon}</div><div class="name">${it.name}</div><div class="price">💰 ${it.price}</div><div class="stock">mochila: ${inventory[it.id]}</div>`;
     div.onclick=()=>buyBoost(it.id);
     shop.appendChild(div);
   });
 }
 
+// ============================================================
+//  BACKEND (Pix / saldo / gastos)
+// ============================================================
+function loadBalance(cb){
+  fetch(API+'/api/balance/'+userId).then(r=>r.json()).then(d=>{ coins=d.balance; updateHUD(); if(cb)cb(); }).catch(()=>{ if(!coins)coins=100; });
+}
+function addCoins(amount){
+  fetch(API+'/api/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId, amount})})
+    .then(r=>r.json()).then(d=>{ coins=d.balance; updateHUD(); }).catch(()=>{});
+}
+function victoryBonus(){
+  return fetch(API+'/api/victory-bonus',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId})})
+    .then(r=>r.json()).then(d=>{ coins=d.balance; updateHUD(); return d.bonus||0; })
+    .catch(()=>{ coins=(coins||0)+25; updateHUD(); return 25; });
+}
+function spendCoins(cost){
+  return fetch(API+'/api/spend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId, cost})})
+    .then(r=>r.json()).then(d=>{
+      if(d.error) return {ok:false};
+      coins=d.balance; updateHUD(); return {ok:true};
+    }).catch(()=>({offline:true}));
+}
+function buyBoost(id){
+  const it=SHOP.find(i=>i.id===id);
+  if(coins<it.price){ msgEl.textContent='Moedas insuficientes! Compre um pacote.'; flashMsg(); return; }
+  fetch(API+'/api/spend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId, cost:it.price})})
+    .then(r=>r.json()).then(d=>{
+      if(d.error){ msgEl.textContent=d.error; return; }
+      coins=d.balance; inventory[id]++; msgEl.textContent=`✔ ${it.name} comprado! ${it.desc}`; sfxBuy(); updateHUD(); renderShop(); renderStartGame();
+    }).catch(()=>msgEl.textContent='Erro ao comprar boost');
+}
 function buyPack(p){
-  // Cria o pagamento Pix no backend
   msgEl.textContent='Gerando QR Code Pix...';
-  fetch(API+'/api/create-pix',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({userId, packId:p.id})
-  }).then(r=>r.json()).then(data=>{
-    if(data.error){ msgEl.textContent=data.error; return; }
-    showPixModal(data, p);
-  }).catch(()=>msgEl.textContent='Erro ao conectar no servidor. Está rodando?');
+  fetch(API+'/api/create-pix',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId, packId:p.id})})
+    .then(r=>r.json()).then(data=>{
+      if(data.error){ msgEl.textContent=data.error; return; }
+      showPixModal(data, p);
+    }).catch(()=>msgEl.textContent='Erro ao conectar no servidor.');
 }
-
 function showPixModal(data, pack){
-  let modal=document.getElementById('pixModal');
-  if(!modal){
-    modal=document.createElement('div');
-    modal.id='pixModal';
-    modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:60;display:flex;align-items:center;justify-content:center;';
-    document.body.appendChild(modal);
-  }
-  modal.innerHTML=`
-    <div style="background:#fff;color:#222;border-radius:16px;padding:24px;max-width:340px;text-align:center;">
-      <h3 style="margin:0 0 10px;">Pagamento Pix</h3>
-      <p style="margin:0 0 10px;font-size:15px;">${pack.name} - <b>${pack.brl}</b></p>
-      <img src="data:image/png;base64,${data.qrCodeBase64}" style="width:200px;height:200px;border:1px solid #ddd;border-radius:8px;margin:0 auto 12px;display:block;"/>
-      <p style="font-size:13px;margin:0 0 8px;">ou copie o código:</p>
-      <textarea id="pixCode" readonly style="width:100%;height:80px;font-size:11px;border:1px solid #ccc;border-radius:8px;padding:6px;box-sizing:border-box;">${data.qrCode}</textarea>
-      <div style="display:flex;gap:8px;margin-top:12px;">
-        <button onclick="copyPix()" style="flex:1;padding:10px;border:none;border-radius:8px;background:#3483fa;color:#fff;font-weight:bold;cursor:pointer;">Copiar</button>
-        <button onclick="checkPix('${data.paymentId}')" style="flex:1;padding:10px;border:none;border-radius:8px;background:#2ecc71;color:#fff;font-weight:bold;cursor:pointer;">Já paguei</button>
-      </div>
-      <button onclick="closePix()" style="margin-top:8px;width:100%;padding:8px;border:none;border-radius:8px;background:#eee;cursor:pointer;">Fechar</button>
-      <p id="pixStatus" style="margin:8px 0 0;font-size:13px;"></p>
-    </div>`;
+  document.getElementById('pixInfo').textContent=`${pack.name} - ${pack.brl}`;
+  document.getElementById('pixImg').src='data:image/png;base64,'+data.qrCodeBase64;
+  document.getElementById('pixCode').value=data.qrCode;
+  document.getElementById('pixStatus').textContent='';
+  document.getElementById('pixStatus').dataset.pid=data.paymentId;
+  document.getElementById('pixOverlay').style.display='flex';
 }
-
+let pixTimer=null;
 function copyPix(){
   const t=document.getElementById('pixCode');
   t.select(); navigator.clipboard?.writeText(t.value);
   document.getElementById('pixStatus').textContent='Código copiado!';
 }
-
-let pixTimer=null;
-function checkPix(paymentId){
+function checkPix(){
+  const paymentId = document.getElementById('pixStatus').dataset.pid;
   const st=document.getElementById('pixStatus');
   st.textContent='Verificando pagamento...';
-  if(pixTimer)clearInterval(pixTimer);
+  if(pixTimer){clearInterval(pixTimer); pixTimer=null;}
   const poll=()=>{
+    if(!document.getElementById('pixStatus')){ clearInterval(pixTimer); return; }
     fetch(API+'/api/payment-status/'+paymentId).then(r=>r.json()).then(d=>{
       if(d.status==='approved'){
         st.textContent='✅ Pagamento aprovado! +'+d.coins+' moedas';
         if(pixTimer){clearInterval(pixTimer); pixTimer=null;}
-        loadBalance();
-        setTimeout(closePix, 2000);
+        loadBalance(()=>{ closePix(); renderStartGame(); });
       }else if(d.status==='pending'){
         st.textContent='Aguardando pagamento...';
-      }else{
-        st.textContent='Status: '+d.status;
-      }
+      }else{ st.textContent='Status: '+d.status; }
     }).catch(()=>st.textContent='Erro ao verificar');
   };
-  poll();
-  pixTimer=setInterval(poll, 4000);
+  poll(); pixTimer=setInterval(poll, 4000);
+}
+function closePix(){ if(pixTimer){clearInterval(pixTimer); pixTimer=null;} document.getElementById('pixOverlay').style.display='none'; }
+
+// ============================================================
+//  JOGO
+// ============================================================
+async function playLevel(L){
+  // 🛑 Cobra a entrada ANTES de abrir a partida (tem que ter moedas para jogar)
+  const r=await spendCoins(L.fee);
+  if(r && r.ok===false){
+    msgEl.textContent=`🛑 Você precisa de ${L.fee} moedas para jogar. Compre um pacote na loja!`;
+    flashMsg(); sfxError(); return;
+  }
+  // r.offline = modo demonstração sem servidor (arquivo aberto direto) → joga de graça
+  COLS=L.cols; ROWS=L.rows; TYPES=L.types; TARGET=L.target; MOVES=L.moves; FEE=L.fee;
+  const th=THEMES[L.theme];
+  document.body.style.background=th.bg;
+  document.documentElement.style.setProperty('--accent', th.accent);
+  const cs = L.cols>8?34 : (L.cols>7?38:44);
+  gridEl.style.gridTemplateColumns=`repeat(${COLS},${cs}px)`;
+  gridEl.style.setProperty('--cs', cs+'px');
+  showScreen('screenGame');
+  document.getElementById('lvlNum').textContent=L.id;
+  document.getElementById('target').textContent=TARGET;
+  score=0; movesLeft=MOVES; selected=null; pendingBoost=null; animating=false; finished=false;
+  updateHUD(); updateProgress();
+  do{ grid=Array.from({length:ROWS},()=>Array.from({length:COLS},()=>Math.floor(Math.random()*TYPES))); }while(hasMatch());
+  render(); renderBoostBar();
+  msgEl.textContent=`Fase ${L.id}: alcance ${TARGET} pontos em ${MOVES} movimentos. Entrada: ${L.fee} moedas. Boa sorte!`;
 }
 
-function closePix(){
-  if(pixTimer){clearInterval(pixTimer); pixTimer=null;}
-  const m=document.getElementById('pixModal');
-  if(m)m.style.display='none';
+function showScreen(id){
+  ['screenMenu','screenGame'].forEach(s=>document.getElementById(s).style.display = (s===id)?'flex':'none');
+}
+function backToMenu(){
+  document.body.style.background='';
+  document.documentElement.style.setProperty('--accent','#fdbb2d');
+  showScreen('screenMenu');
+  closeWin(); closeLose();
+  renderStartGame();
+}
+function renderStartGame(){ renderLevelMap(); renderPacks(); renderShop(); updateHUD(); }
+function openShopModal(){ backToMenu(); document.getElementById('screenMenu').scrollIntoView({behavior:'smooth'});
+
 }
 
-function loadBalance(){
-  fetch(API+'/api/balance/'+userId).then(r=>r.json()).then(d=>{
-    coins=d.balance;
-    updateHUD();
-  }).catch(()=>{});
+function updateHUD(){
+  document.getElementById('coins').textContent=coins;
+  document.getElementById('gcoins').textContent=coins;
+  document.getElementById('score').textContent=score;
+  document.getElementById('moves').textContent=movesLeft;
+  const pct=Math.min(100, Math.round(score/TARGET*100));
+  document.getElementById('progressFill').style.width=pct+'%';
+}
+function updateProgress(){
+  const bar=document.getElementById('progressFill');
+  if(bar){ const pct=Math.min(100, Math.round(score/TARGET*100)); bar.style.width=pct+'%'; }
 }
 
-function addCoins(amount){
-  fetch(API+'/api/add',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({userId, amount})
-  }).then(r=>r.json()).then(d=>{ coins=d.balance; updateHUD(); }).catch(()=>{});
-}
-
-function buyBoost(id){
-  const it=SHOP.find(i=>i.id===id);
-  if(coins<it.price){ msgEl.textContent='Moedas insuficientes! Compre um pacote.'; return; }
-  // Desconta no backend (fonte de verdade) e atualiza local
-  fetch(API+'/api/spend',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({userId, cost:it.price})
-  }).then(r=>r.json()).then(d=>{
-    if(d.error){ msgEl.textContent=d.error; return; }
-    coins=d.balance;
-    inventory[id]++;
-    msgEl.textContent=`Comprado: ${it.name}! `+it.desc;
-    sfxBuy();
-    updateHUD();
-    renderShop();
-  }).catch(()=>msgEl.textContent='Erro ao comprar boost');
-}
-
-function updateHUD(){ coinsEl.textContent=coins; scoreEl.textContent=score; }
-
-function init(){
-  gridEl.style.gridTemplateColumns=`repeat(${COLS},42px)`;
-  do{ grid=Array.from({length:ROWS},()=>Array.from({length:COLS},()=>TYPES[Math.floor(Math.random()*TYPES.length)])); }while(hasMatch());
-  render();
-}
 function hasMatch(){ return findMatches().size>0; }
-
 function findMatches(){
   const m=new Set();
   for(let r=0;r<ROWS;r++){ let run=1; for(let c=1;c<COLS;c++){ if(grid[r][c]===grid[r][c-1])run++; else{ if(run>=3)for(let k=c-run;k<c;k++)m.add(r+'-'+k); run=1; } } if(run>=3)for(let k=COLS-run;k<COLS;k++)m.add(r+'-'+k); }
@@ -258,22 +456,10 @@ function findMatches(){
   return m;
 }
 
-function wantsBoost(id){ return inventory[id]>0; }
-
 function handleClick(r,c){
-  if(animating)return;
+  if(animating||finished)return;
   sfxTap();
-
-  // Aplicar boost se tiver um selecionado para usar
-  if(pendingBoost){
-    applyBoost(pendingBoost,r,c);
-    pendingBoost=null;
-    return;
-  }
-
-  // Automatizar: se possuir boost, oferece via mensagem? Mantém simples: um tap no HUD não.
-  // Usamos: bomba/coringa ativam ao tocar. swapAll/bonus usam direto pelo botão de compra? Não: há mochila.
-  // Simplificar: cada uso ativado ao tocar numa peça.
+  if(pendingBoost){ applyBoost(pendingBoost,r,c); pendingBoost=null; return; }
   if(!selected){ selected=[r,c]; render(); return; }
   const [sr,sc]=selected;
   if((sr===r&&Math.abs(sc-c)===1)||(sc===c&&Math.abs(sr-r)===1)){
@@ -286,93 +472,138 @@ function trySwap(sr,sc,r,c){
   if(animating)return false;
   [grid[sr][sc],grid[r][c]]=[grid[r][c],grid[sr][sc]];
   const m=findMatches();
-  if(m.size===0){ [grid[sr][sc],grid[r][c]]=[grid[r][c],grid[sr][sc]]; msgEl.textContent='Movimento inválido'; return false; }
+  if(m.size===0){
+    // JOGADA ERRADA: perde pontos
+    [grid[sr][sc],grid[r][c]]=[grid[r][c],grid[sr][sc]];
+    losePoints(30);
+    msgEl.textContent='❌ Movimento errado! -30 pontos';
+    flashMsg(); sfxError();
+    const wrap=document.getElementById('boardWrap');
+    wrap.classList.remove('shaking'); void wrap.offsetWidth; wrap.classList.add('shaking');
+    // Se houver limite de movimentos, erros também custam um movimento (dificuldade)
+    useMove();
+    return false;
+  }
   msgEl.textContent='Boa! Combinou!'; sfxSwap(); processMatches(); return true;
 }
 
-// Swipe/arrastar para trocar (mobile)
+function useMove(){
+  if(finished)return;
+  movesLeft--;
+  updateHUD();
+  if(movesLeft<=0 && score<TARGET){ endLevel(false); }
+}
+
+// perder pontos (clamp >=0)
+function losePoints(n){ score=Math.max(0, score- n); updateHUD(); }
+
+// efeito de pontos flutuantes
+function floatPoints(text, cellEl){
+  if(!cellEl)return;
+  const r=cellEl.getBoundingClientRect();
+  const f=document.createElement('div');
+  f.className='floatScore'; f.textContent=text;
+  f.style.left=(r.left+r.width/2)+'px'; f.style.top=r.top+'px';
+  document.body.appendChild(f);
+  setTimeout(()=>f.remove(), 1000);
+}
+
+// Swipe/arrastar (mobile)
 let dragFrom=null;
 gridEl.addEventListener('pointerdown',e=>{
-  if(animating){ dragFrom=null; return; }
-  const t=e.target.closest('.cell');
+  if(animating||finished){ dragFrom=null; return; }
+  const t=e.target.closest('.candy');
   if(t){ dragFrom=[+t.dataset.r,+t.dataset.c]; }
 });
 gridEl.addEventListener('pointerenter',e=>{
-  if(!dragFrom||animating)return;
-  const t=e.target.closest('.cell'); if(!t)return;
+  if(!dragFrom||animating||finished)return;
+  const t=e.target.closest('.candy'); if(!t)return;
   const [sr,sc]=dragFrom;
   const r=+t.dataset.r, c=+t.dataset.c;
   if((sr===r&&Math.abs(sc-c)===1)||(sc===c&&Math.abs(sr-r)===1)){
-    dragFrom=null;
-    if(trySwap(sr,sc,r,c)){ selected=null; render(); }
+    dragFrom=null; trySwap(sr,sc,r,c); selected=null; render();
   }
 });
 document.addEventListener('pointerup',()=>{ dragFrom=null; });
 
-// Botões para usar boosts da mochila
-function useBoost(id,r,c){
-  if(inventory[id]<=0){ msgEl.textContent='Você não tem esse boost.'; pendingBoost=null; render(); return; }
-  inventory[id]--;
-  renderShop();
-  applyBoost(id,r,c);
+// Boosts
+function useBoost(id){
+  if(finished)return;
+  if(inventory[id]<=0){ msgEl.textContent='Você não tem esse boost.'; return; }
+  if(id==='swapAll'||id==='bonus'){ inventory[id]--; renderShop(); renderBoostBar(); applyBoost(id); }
+  else { pendingBoost=id; renderBoostBar(); msgEl.textContent='Toque numa peça →'; }
 }
-
 function applyBoost(id,r,c){
   switch(id){
     case 'bomb':
-      if(r===undefined){ msgEl.textContent='Toque numa peça para explodir'; pendingBoost='bomb'; break; }
-      explodeAround(r,c);
-      break;
+      if(r===undefined){ msgEl.textContent='Toque numa peça para explodir'; pendingBoost='bomb'; renderBoostBar(); break; }
+      inventory.bomb--; renderShop(); renderBoostBar();
+      explodeAround(r,c); break;
     case 'swapAll':
-      shuffleNoMatch();
-      msgEl.textContent='Peças reembaralhadas!';
-      break;
+      shuffleNoMatch(); msgEl.textContent='Peças reembaralhadas!'; sfxSwap(); break;
     case 'wild':
-      if(r===undefined){ msgEl.textContent='Toque numa peça para transformá-la'; pendingBoost='wild'; break; }
-      // torna peça aleatória diferente
-      let t=TYPES[Math.floor(Math.random()*TYPES.length)];
-      grid[r][c]=t;
-      render(); processMatches(); checkNoMoves();
-      break;
+      if(r===undefined){ msgEl.textContent='Toque numa peça para transformá-la'; pendingBoost='wild'; renderBoostBar(); break; }
+      inventory.wild--; renderShop(); renderBoostBar();
+      let t=Math.floor(Math.random()*TYPES); grid[r][c]=t; render(); processMatches(); checkNoMoves(); break;
     case 'bonus':
-      score+=500; updateHUD(); msgEl.textContent='+500 pontos!';
-      sfxCoin();
-      if(score>=WIN_TARGET)showWin();
+      score+=500; updateHUD(); msgEl.textContent='+500 pontos!'; sfxCoin(); floatPoints('+500', gridEl.children[0]);
       break;
   }
   render();
 }
-
 function explodeAround(r,c){
   const rr=[-1,1,0,0,-1,-1,1,1], cc=[0,0,-1,1,-1,1,-1,1];
   const cells=new Set([r+'-'+c]);
   for(let i=0;i<8;i++){ const nr=r+rr[i], nc=c+cc[i]; if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS)cells.add(nr+'-'+nc); }
   cells.forEach(k=>{ const [ar,ac]=k.split('-').map(Number); grid[ar][ac]=null; });
-  score+=cells.size*5; updateHUD();
-  sfxMatch();
-  processMatches();
-  if(score>=WIN_TARGET)showWin();
-  checkNoMoves();
+  const gained=cells.size*5; score+=gained; updateHUD();
+  sfxMatch(); floatPoints('+'+gained, gridEl.children[r*COLS+c]);
+  processMatches(); checkNoMoves(); checkWin();
+}
+function renderBoostBar(){
+  const bar=document.getElementById('boostbar');
+  if(!bar)return;
+  bar.style.cssText='display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;justify-content:center;padding:0 10px;max-width:560px;';
+  bar.innerHTML='';
+  SHOP.forEach(it=>{
+    if(inventory[it.id]>0){
+      const b=document.createElement('button');
+      b.className='btn'; b.style.fontSize='12px';
+      b.innerHTML=`${it.icon} usar (${inventory[it.id]})`;
+      b.onclick=()=>useBoost(it.id);
+      bar.appendChild(b);
+    }
+  });
+  if(pendingBoost){
+    const note=document.createElement('span');
+    note.style.cssText='align-self:center;font-size:13px;color:var(--accent);'; note.textContent='→ toque numa peça'; bar.appendChild(note);
+  }
 }
 
 async function processMatches(){
-  let m=findMatches(), cascade=0;
+  if(finished)return;
+  let m=findMatches(), cascade=0, firstCell=null;
   while(m.size>0){
     animating=true; cascade++;
-    score+=m.size*10*cascade; coins+=m.size; updateHUD();
+    const gained=m.size*10*cascade;
+    score+=gained; coins+=m.size; updateHUD();
     addCoins(m.size);
     sfxMatch(); if(m.size>=5)sfxCoin();
-    msgEl.textContent = cascade>1 ? `🔥 Combo x${cascade}! +${m.size*10*cascade}` : `Boa! +${m.size*10} pontos`;
-    m.forEach(key=>{ const [r,c]=key.split('-').map(Number); const cell=gridEl.children[r*COLS+c]; if(cell)cell.classList.add('exploding'); });
-    await sleep(350);
-    m.forEach(key=>{ const [r,c]=key.split('-').map(Number); grid[r][c]=null; });
+    const keys=[...m];
+    const [fr,fc]=keys[0].split('-').map(Number);
+    firstCell=gridEl.children[fr*COLS+fc];
+    floatPoints('+'+gained, firstCell);
+    msgEl.textContent = cascade>1 ? `🔥 Combo x${cascade}! +${gained}` : `Boa! +${gained} pontos`;
+    keys.forEach(key=>{ const [r,c]=key.split('-').map(Number); const cell=gridEl.children[r*COLS+c]; if(cell)cell.classList.add('exploding'); });
+    await sleep(320);
+    keys.forEach(key=>{ const [r,c]=key.split('-').map(Number); grid[r][c]=null; });
     applyGravity(); render();
-    Array.from(gridEl.children).forEach((el,i)=>{ el.classList.add('fall'); el.style.animationDelay=(i*6)+'ms'; });
+    Array.from(gridEl.children).forEach((el,i)=>{ el.classList.add('fall'); el.style.animationDelay=(i*5)+'ms'; });
     m=findMatches();
-    if(m.size>0)await sleep(220);
+    if(m.size>0)await sleep(200);
   }
   animating=false;
-  if(score>=WIN_TARGET){ showWin(); return; }
+  if(score>=TARGET){ endLevel(true); return; }
   checkNoMoves();
 }
 
@@ -381,7 +612,7 @@ function applyGravity(){
     for(let r=ROWS-1;r>=0;r--){
       if(grid[r][c]===null){
         for(let k=r-1;k>=0;k--){ if(grid[k][c]!==null){ grid[r][c]=grid[k][c]; grid[k][c]=null; break; } }
-        if(grid[r][c]===null)grid[r][c]=TYPES[Math.floor(Math.random()*TYPES.length)];
+        if(grid[r][c]===null)grid[r][c]=Math.floor(Math.random()*TYPES);
       }
     }
   }
@@ -391,32 +622,12 @@ function render(){
   gridEl.innerHTML='';
   for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
     const div=document.createElement('div');
-    div.className='cell';
+    div.className='candy';
+    div.style.background=CANDY_GRADS[grid[r][c]];
     if(selected&&selected[0]===r&&selected[1]===c)div.classList.add('selected');
-    div.textContent=grid[r][c];
     div.dataset.r=r; div.dataset.c=c;
     div.onclick=()=>handleClick(r,c);
     gridEl.appendChild(div);
-  }
-  renderToolbar();
-}
-
-function renderToolbar(){
-  // Barra de ações para usar boosts
-  let bar=document.getElementById('boostbar');
-  if(!bar){ bar=document.createElement('div'); bar.id='boostbar'; bar.style.cssText='display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;justify-content:center;padding:0 10px'; gridEl.parentNode.insertBefore(bar,gridEl.nextSibling); }
-  bar.innerHTML='';
-  SHOP.forEach(it=>{
-    if(inventory[it.id]>0){
-      const b=document.createElement('button');
-      b.className='btn';
-      b.innerHTML=`${it.icon} usar (${inventory[it.id]})`;
-      b.onclick=()=>useBoost(it.id);
-      bar.appendChild(b);
-    }
-  });
-  if(pendingBoost){
-    const note=document.createElement('span'); note.style.cssText='align-self:center;font-size:13px;color:#fdbb2d'; note.textContent='→ toque numa peça'; bar.appendChild(note);
   }
 }
 
@@ -426,18 +637,81 @@ function checkNoMoves(){
     if(c+1<COLS){ [grid[r][c],grid[r][c+1]]=[grid[r][c+1],grid[r][c]]; if(hasMatch())ok=true; [grid[r][c],grid[r][c+1]]=[grid[r][c+1],grid[r][c]]; }
     if(r+1<ROWS){ [grid[r][c],grid[r+1][c]]=[grid[r+1][c],grid[r][c]]; if(hasMatch())ok=true; [grid[r][c],grid[r+1][c]]=[grid[r+1][c],grid[r][c]]; }
   }
-  if(!ok){ msgEl.textContent='Sem movimentos! Reembaralhando...'; shuffleNoMatch(); }
+  if(!ok){ msgEl.textContent='Sem movimentos! Reembaralhando...'; sfxError(); shuffleNoMatch(); }
+}
+function shuffleNoMatch(){
+  do{ grid=Array.from({length:ROWS},()=>Array.from({length:COLS},()=>Math.floor(Math.random()*TYPES))); }while(hasMatch());
+  render();
+}
+function checkWin(){ if(score>=TARGET && !finished) endLevel(true); }
+
+// fim de fase
+async function endLevel(win){
+  if(finished)return; finished=true; animating=false;
+  const L=LEVELS.find(l=>l.id===+document.getElementById('lvlNum').textContent);
+  if(win){
+    let bonus=0;
+    try{ bonus = await victoryBonus(); }catch(e){ bonus=25; coins+=25; updateHUD(); }
+    // estrelas conforme movimentos sobrando
+    const ratio=movesLeft / MOVES; // mantém referencia de MOVES dessa fase
+    let stars = ratio>=0.6?3 : (ratio>=0.3?2:1);
+    if(stars> (progress.stars[L.id]||0)) progress.stars[L.id]=stars;
+    if(L.id>=progress.unlocked && L.id<LEVELS.length) progress.unlocked=L.id+1;
+    refreshProgress();
+    document.getElementById('winStars').textContent='⭐'.repeat(stars);
+    document.getElementById('winScore').textContent=score;
+    document.getElementById('winBonus').textContent=bonus;
+    document.getElementById('winOverlay').style.display='flex';
+    confettiRain();
+    sfxWin();
+  }else{
+    document.getElementById('loseScore').textContent=score;
+    document.getElementById('loseTarget').textContent=TARGET;
+    document.getElementById('loseOverlay').style.display='flex';
+    sfxLose();
+  }
+  renderBoostBar();
+}
+function nextLevel(){
+  closeWin();
+  const L=LEVELS.find(l=>l.id===+document.getElementById('lvlNum').textContent);
+  const nxt=LEVELS.find(l=>l.id===L.id+1);
+  backToMenu();
+  if(nxt) playLevel(nxt);
+}
+function retryLevel(){
+  closeLose();
+  const L=LEVELS.find(l=>l.id===+document.getElementById('lvlNum').textContent);
+  playLevel(L);
+}
+function closeWin(){ document.getElementById('winOverlay').style.display='none'; }
+function closeLose(){ document.getElementById('loseOverlay').style.display='none'; }
+function confettiRain(){
+  const w=document.getElementById('winOverlay');
+  w.querySelectorAll('.confetti').forEach(c=>c.remove());
+  const colors=['#fdbb2d','#2ecc71','#3498db','#e74c3c','#9b59b6','#ff5e62'];
+  for(let i=0;i<50;i++){
+    const c=document.createElement('div');
+    c.className='confetti';
+    c.style.left=Math.random()*100+'vw';
+    c.style.background=colors[Math.floor(Math.random()*colors.length)];
+    c.style.animationDelay=(Math.random()*3)+'s';
+    w.appendChild(c);
+  }
 }
 
-function shuffleNoMatch(){
-  do{ grid=Array.from({length:ROWS},()=>Array.from({length:COLS},()=>TYPES[Math.floor(Math.random()*TYPES.length)])); }while(hasMatch());
-  render();
+// mensagens rápidas
+function flashMsg(){
+  msgEl.style.opacity=1;
+  clearTimeout(msgEl._t);
+  msgEl._t=setTimeout(()=>{ msgEl.style.transition='opacity .8s'; msgEl.style.opacity=0.6; setTimeout(()=>msgEl.style.opacity=1, 900); },2500);
 }
 
 function sleep(ms){ return new Promise(res=>setTimeout(res,ms)); }
-function newGame(){ score=0; selected=null; pendingBoost=null; won=false; updateHUD(); init(); msgEl.textContent='Novo jogo!'; }
 
-// ---------- SOM (Web Audio API) ----------
+// ============================================================
+//  SOM
+// ============================================================
 function getCtx(){
   if(!audioCtx){ try{ audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
   return audioCtx;
@@ -456,39 +730,18 @@ function sfxSwap(){ tone(300,0.1,'sine',0.15); }
 function sfxMatch(){ for(let i=0;i<4;i++)setTimeout(()=>tone(500+i*150,0.12,'triangle',0.18),i*50); }
 function sfxCoin(){ tone(700,0.1,'sine',0.15); setTimeout(()=>tone(950,0.12,'sine',0.15),70); }
 function sfxBuy(){ tone(500,0.1,'sine',0.15); setTimeout(()=>tone(800,0.15,'sine',0.15),90); }
+function sfxError(){ tone(220,0.2,'sawtooth',0.15); setTimeout(()=>tone(160,0.25,'sawtooth',0.15),120); }
 function sfxWin(){ for(let i=0;i<8;i++)setTimeout(()=>tone(400+i*120,0.18,'triangle',0.2),i*120); }
+function sfxLose(){ for(let i=5;i>=0;i--)setTimeout(()=>tone(300-i*40,0.25,'sine',0.15),(5-i)*160); }
 function toggleSound(){
   soundOn=!soundOn;
   document.getElementById('soundBtn').textContent=soundOn?'🔊':'🔇';
   if(soundOn)sfxTap();
 }
 
-// ---------- VITÓRIA ----------
-function showWin(){
-  if(won)return; won=true;
-  document.getElementById('winScore').textContent=score;
-  document.getElementById('winCoins').textContent=coins;
-  // confetes
-  const w=document.getElementById('win');
-  const colors=['#fdbb2d','#2ecc71','#3498db','#e74c3c','#9b59b6'];
-  for(let i=0;i<40;i++){
-    const c=document.createElement('div');
-    c.className='confetti';
-    c.style.left=Math.random()*100+'vw';
-    c.style.background=colors[Math.floor(Math.random()*colors.length)];
-    c.style.animationDelay=(Math.random()*3)+'s';
-    w.appendChild(c);
-  }
-  w.style.display='flex';
-  sfxWin();
-}
-function closeWin(){
-  const w=document.getElementById('win');
-  const cc=w.querySelectorAll('.confetti');
-  cc.forEach(x=>x.remove());
-  w.style.display='none';
-}
-
+// ============================================================
+//  PACOTES (back-end)
+// ============================================================
 function loadPacks(){
   fetch(API+'/api/packs').then(r=>r.json()).then(d=>{
     PACKS=d.map((p,i)=>({id:p.id, icon:['🪙','💰','💎'][i]||'🪙', name:p.name, brl:('R$ '+p.brl.toFixed(2).replace('.',',')), coins:p.coins}));
@@ -496,7 +749,7 @@ function loadPacks(){
   }).catch(()=>{});
 }
 
-renderPacks(); renderShop(); loadBalance(); loadPacks(); newGame();
+renderStartGame(); loadBalance(); loadPacks();
 </script>
 </body>
 </html>
