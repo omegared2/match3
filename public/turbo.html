@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Modo Turbo</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:system-ui,sans-serif; background:
+    radial-gradient(1000px 500px at 50% -10%, #3b2466, transparent), #170f2e; color:#fff;
+    min-height:100vh; }
+  header { padding:14px 16px 6px; display:flex; justify-content:space-between; align-items:center; }
+  header h1 { font-size:20px; } header h1 b { color:#ffd700; }
+  .pill { background:rgba(255,255,255,.1); border-radius:999px; padding:6px 12px; font-size:13px; }
+  .tela { position:relative; text-align:center; padding:18px 16px; }
+  .mult { font-size:74px; font-weight:900; line-height:1; }
+  .mult .x { font-size:26px; color:#a99bcc; }
+  .mult.bom { color:#2ecc71; text-shadow:0 0 30px rgba(46,204,113,.45); }
+  .mult.ruim { color:#ff7878; text-shadow:0 0 30px rgba(255,120,120,.4); }
+  .estado { font-size:13px; color:#a99bcc; margin-top:6px; min-height:18px; }
+  .count { font-size:24px; color:#ffd700; font-weight:800; margin-top:4px; }
+  .bars { display:flex; gap:8px; padding:10px 16px; }
+  .btn { flex:1; border:none; border-radius:14px; padding:15px; font-size:16px; font-weight:800; cursor:pointer; }
+  .btn.gold { background:linear-gradient(135deg,#ffd700,#ff9d00); color:#3a2a00; }
+  .btn.green { background:linear-gradient(135deg,#2ecc71,#1f8a4c); color:#fff; }
+  .btn.dark { background:rgba(255,255,255,.14); color:#fff; }
+  .btn:disabled { opacity:.42; }
+  .auto { display:flex; align-items:center; justify-content:center; gap:8px; font-size:13px; color:#a99bcc; padding:8px; }
+  .auto input { width:18px; height:18px; }
+  .hists { padding:4px 16px 14px; }
+  .hists h3 { font-size:12px; color:#8b7fb0; letter-spacing:2px; }
+  .hist { display:flex; justify-content:space-between; background:rgba(255,255,255,.05); border-radius:9px;
+    padding:8px 12px; margin-top:6px; font-size:13px; }
+  .hist .crash { font-weight:900; color:#2ecc71; }
+  .hist .crash.bust { color:#ff7878; }
+  .aviso { font-size:11px; color:#6b5f96; line-height:1.6; padding:10px 24px 8px; text-align:center; }
+  .gate { position:fixed; inset:0; background:rgba(10,5,20,.94); z-index:30; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center; padding:26px; }
+  .gate.hide { display:none; }
+  .gate h2 { font-size:22px; margin-bottom:12px; color:#ffd700; }
+  .gate p { font-size:13px; color:#a99bcc; max-width:420px; line-height:1.6; }
+  .gate .ok { margin-top:20px; }
+  .gate label { display:flex; align-items:center; gap:8px; font-size:14px; margin-top:14px; justify-content:center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🚀 <b>MODO TURBO</b></h1>
+  <span class="pill">💰 <b id="coins">?</b> 🪙</span>
+</header>
+
+<div class="tela">
+  <div class="mult" id="mult">1.00<span class="x">x</span></div>
+  <div class="estado" id="estado">Aguardando início da rodada</div>
+  <div class="count" id="count"></div>
+</div>
+
+<div class="bars">
+  <button class="btn gold" id="btnBet">⚡ Apostar · <span id="custo">20</span> 🪙</button>
+  <button class="btn green" id="btnCash" disabled>💵 Resgatar</button>
+</div>
+<div class="auto"><input type="checkbox" id="auto" checked/> <label for="auto">Resgatar automático em ~x1.10</label></div>
+
+<div class="hists">
+  <h3>ÚLTIMAS RODADAS</h3>
+  <div id="hists"></div>
+</div>
+<div class="aviso">⚠️ Jogo de azar estilo cassino. Permitido apenas para maiores de 18 anos.
+As moedas são virtuais, sem retirada em dinheiro real. Jogue com responsabilidade.</div>
+
+<div class="gate" id="gate">
+  <h2>🔞 Modo Turbo</h2>
+  <p>Este modo reproduz uma dinâmica de cassino (multiplicador que sobe até estourar).
+  É destinado somente a maiores de 18 anos. Participar de apostas pode causar vício e
+  perdas. A plataforma usa <b>moedas virtuais que não podem ser convertidas de volta em
+  dinheiro</b>.</p>
+  <label><input type="checkbox" id="maior"/> <span>Sou maior de 18 anos e entendi o aviso</span></label>
+  <button class="btn gold ok" id="btnEntrar" disabled>Entrar no Modo Turbo</button>
+</div>
+
+<script>
+  const API = (location.origin === 'file://' || location.origin.indexOf('localhost') !== -1) ? 'https://match3-te1c.onrender.com' : '';
+  let userId = localStorage.getItem('match3_user') || ('player_' + Math.random().toString(36).slice(2,10));
+  localStorage.setItem('match3_user', userId);
+  const $ = id => document.getElementById(id);
+  const fmt = n => Number(n).toLocaleString('pt-BR');
+  const c2 = m => Number(m).toFixed(2);
+  let estado = null;
+
+  if (localStorage.getItem('turbo_ok') === '1') { mostrarJogo(); }
+
+  function mostrarJogo(){ $('gate').classList.add('hide'); localStorage.setItem('turbo_ok','1'); }
+  $('maior').onchange = e => $('btnEntrar').disabled = !e.target.checked;
+  $('btnEntrar').onclick = mostrarJogo;
+
+  function apostar(){
+    fetch(API+'/api/turbo/bet',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId, autoCash:$('auto').checked})})
+      .then(r=>r.json()).then(d=>{
+        if(d.error){ $('estado').textContent=d.error; return; }
+        $('coins').textContent=fmt(d.balance);
+        $('estado').textContent='⚡ Aposta feita! Acompanhando o multiplicador...';
+      }).catch(()=>{});
+  }
+  function resgatar(){
+    fetch(API+'/api/turbo/cashout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId})})
+      .then(r=>r.json()).then(d=>{
+        if(d.error){ $('estado').textContent=d.error; return; }
+        $('mult').classList='mult bom';
+        $('estado').textContent='💵 Resgatou '+c2(d.mult)+'x! Ganhou +'+fmt(d.won)+' moedas';
+        $('coins').textContent=fmt(d.balance);
+        status();
+      }).catch(()=>{});
+  }
+  $('btnBet').onclick = apostar;
+  $('btnCash').onclick = resgatar;
+
+  function status(){
+    fetch(API+'/api/turbo/status?userId='+encodeURIComponent(userId))
+      .then(r=>r.json()).then(d=>{
+        estado = d;
+        $('custo').textContent = d.bet;
+        const mult = $('mult');
+        mult.firstChild.nodeValue = ' ' + c2(d.mult) + ' ';
+        mult.className = 'mult ' + (d.phase==='crashed' ? 'ruim' : 'bom');
+        const mine = d.mine;
+        $('btnCash').disabled = !(d.phase==='running' && mine && !mine.cashed);
+        $('btnBet').disabled = !(d.phase==='wait' && !mine);
+        const ms = d.countdownMs;
+        $('count').textContent = d.phase==='wait' ? (ms>0 ? 'Próxima rodada em '+Math.ceil(ms/1000)+'s' : '') : (d.phase==='running' ? 'VAI BRASIL! 🚀' : '💥 ESTOUROU em x'+c2(d.crash));
+        $('hists').innerHTML = (d.lastRounds||[]).map(h=>'<div class="hist"><span>#'+h.id+'</span><span class="crash'+(h.crash<1.05?' bust':'')+'">x'+c2(h.crash)+'</span></div>').join('');
+        if (mine && mine.cashed && d.phase!=='crashed') $('estado').textContent = 'Resgatado nesta rodada ✓';
+      }).catch(()=>{});
+  }
+  fetch(API+'/api/balance/'+userId).then(r=>r.json()).then(d=>$('coins').textContent=fmt(d.balance)).catch(()=>{});
+  status();
+  setInterval(status, 800);
+</script>
+</body>
+</html>

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Roda da Fortuna</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:system-ui,sans-serif; background:
+    radial-gradient(1000px 500px at 50% -10%, #3b2466, transparent), #170f2e; color:#fff;
+    min-height:100vh; text-align:center; }
+  header { padding:14px 16px 6px; display:flex; justify-content:space-between; align-items:center; }
+  header h1 { font-size:22px; } header h1 b { color:#ffd700; }
+  .pill { background:rgba(255,255,255,.1); border-radius:999px; padding:6px 12px; font-size:13px; }
+  .pot { padding:8px 16px 2px; }
+  .pot .lbl { font-size:12px; color:#a99bcc; letter-spacing:2px; }
+  .pot .val { font-size:34px; font-weight:900; color:#ffd700; text-shadow:0 0 22px rgba(255,215,0,.4); }
+  .stage { position:relative; width:min(320px,86vw); height:min(320px,86vw); margin:14px auto 8px; }
+  canvas { width:100%; height:100%; border-radius:50%; transition:transform 5s cubic-bezier(.15,.75,.2,1); box-shadow:0 0 40px rgba(122,92,255,.35); }
+  .ponteiro { position:absolute; top:-6px; left:50%; transform:translateX(-50%); font-size:34px; z-index:5; text-shadow:0 2px 6px #000; }
+  .bar { display:flex; gap:10px; padding:10px 16px; margin-top:6px; }
+  .btn { flex:1; border:none; border-radius:14px; padding:14px; font-size:16px; font-weight:800; cursor:pointer; }
+  .btn.accent { background:linear-gradient(135deg,#ffd700,#ff9d00); color:#3a2a00; }
+  .btn.gray { background:rgba(255,255,255,.14); color:#fff; }
+  .btn:disabled { opacity:.45; }
+  .msg { min-height:24px; font-size:15px; padding:4px 16px; color:#b9aae0; }
+  .msg.bom { color:#2ecc71; font-weight:800; }
+  .msg.foi { color:#ff7878; font-weight:800; }
+  .recent { padding:6px 16px 26px; }
+  .recent h3 { font-size:12px; color:#8b7fb0; letter-spacing:2px; margin-bottom:8px; }
+  .chips { display:flex; flex-direction:column; gap:6px; }
+  .chip { display:flex; justify-content:space-between; background:rgba(255,255,255,.06); border-radius:10px; padding:8px 12px; font-size:13px; }
+  .chip .n { color:#a99bcc; max-width:55%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chip .v { font-weight:800; }
+  .chip .v.ok { color:#2ecc71; } .chip .v.nao { color:#ff7878; } .chip .v.jp { color:#ffd700; }
+  .mini { font-size:11px; color:#6b5f96; padding:0 40px 14px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎡 <b>RODA</b></h1>
+  <span class="pill">💰 <b id="coins">?</b> 🪙</span>
+</header>
+
+<div class="pot">
+  <div class="lbl">💰 POTE DO JACKPOT</div>
+  <div class="val" id="pot">0</div>
+</div>
+
+<div class="stage">
+  <div class="ponteiro">🔻</div>
+  <canvas id="w" width="640" height="640"></canvas>
+</div>
+<div class="msg" id="msg"></div>
+
+<div class="bar">
+  <button class="btn accent" id="btnSpin">🎡 Girar · <span id="custo">30</span> 🪙</button>
+  <button class="btn gray" onclick="location.href='/'">🪙 + Moedas</button>
+</div>
+<div class="mini">3% de cada giro alimenta o pote · cair em JACKPOT leva tudo</div>
+
+<div class="recent">
+  <h3>ÚLTIMOS GIROS</h3>
+  <div class="chips" id="recent"></div>
+</div>
+
+<script>
+  const API = (location.origin === 'file://' || location.origin.indexOf('localhost') !== -1) ? 'https://match3-te1c.onrender.com' : '';
+  let userId = localStorage.getItem('match3_user') || ('player_' + Math.random().toString(36).slice(2,10));
+  localStorage.setItem('match3_user', userId);
+
+  const SEG = [
+    { m:'x0',  rot:7  },
+    { m:'x1',  rot:15 },
+    { m:'x1.5',rot:24 },
+    { m:'x2',  rot:34 },
+    { m:'x3',  rot:44 },
+    { m:'x5',  rot:54 },
+    { m:'JACKPOT', rot:66 }
+  ];
+  const COR = ['#8e44ad','#4361ee','#16a085','#e67e22','#d35400','#c0392b','#ffd700'];
+
+  const canvas = document.getElementById('w');
+  const ctx = canvas.getContext('2d');
+  let rotacaoAtual = 0, girando = false;
+
+  function desenhar(){
+    const n = SEG.length, ang = Math.PI*2/n, cx=320, cy=320, r=315;
+    ctx.clearRect(0,0,640,640);
+    for(let i=0;i<n;i++){
+      ctx.beginPath();
+      ctx.moveTo(cx,cy);
+      ctx.arc(cx,cy,r, i*ang, (i+1)*ang);
+      ctx.closePath();
+      ctx.fillStyle = COR[i];
+      ctx.fill();
+      ctx.strokeStyle = '#170f2e';
+      ctx.lineWidth = 6;
+      ctx.stroke();
+      ctx.save();
+      ctx.translate(cx,cy);
+      ctx.rotate(i*ang + ang/2);
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 40px system-ui';
+      const lbl = SEG[i].m;
+      const t = lbl === 'x0' ? 'PERDEU' : lbl === 'JACKPOT' ? '💰JACKPOT💰' : lbl;
+      ctx.fillText(t, 190, 8);
+      ctx.restore();
+    }
+    ctx.beginPath();
+    ctx.arc(cx,cy,46,0,Math.PI*2);
+    ctx.fillStyle = '#170f2e';
+    ctx.fill();
+    ctx.fillStyle = '#ffd700';
+    ctx.font = 'bold 42px system-ui';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('🎯', cx, cy);
+  }
+  desenhar();
+
+  const $ = id => document.getElementById(id);
+  const fmt = n => Number(n).toLocaleString('pt-BR');
+
+  function msg(txt, cls){ const el=$('msg'); el.textContent=txt; el.className='msg '+(cls||''); }
+
+  function rodar(){
+    if(girando) return;
+    girando = true;
+    $('btnSpin').disabled = true;
+    msg('Girando...');
+    fetch(API+'/api/roda/spin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId, nick:userId})})
+      .then(r=>r.json()).then(d=>{
+        if(d.error){ girando=false; $('btnSpin').disabled=false; msg('❌ '+d.error, 'foi'); return; }
+        $('coins').textContent = fmt(d.balance);
+        $('pot').textContent = fmt(d.pot);
+        aterrissar(d.segmentIndex, d);
+      }).catch(()=>{ girando=false; $('btnSpin').disabled=false; msg('Sem internet, tenta de novo','foi'); });
+  }
+
+  function aterrissar(idx, d){
+    const n = SEG.length, angGraus = 360/n;
+    const centro = idx*angGraus + angGraus/2 + 90;        // offset: ângulo 0 do canvas é "3 horas"
+    const spinExtra = 5*360 + (360 - (rotacaoAtual % 360) ) + centro; // sempre pra frente
+    const alvo = rotacaoAtual + spinExtra;
+    rotacaoAtual = alvo;
+    canvas.style.transform = 'rotate('+alvo+'deg)';
+    setTimeout(()=>{
+      girando = false;
+      $('btnSpin').disabled = false;
+      if(d.mult === 'JACKPOT'){
+        msg('💰💰 JACKPOT! Você levou '+fmt(d.won)+' moedas!! 💰💰', 'bom');
+      } else if(d.won > 0){
+        msg('🎉 Acertou '+SEG[idx].m+'! Ganhou +'+fmt(d.won)+' moedas', 'bom');
+      } else {
+        msg('😅 Caiu em PERDEU! Tenta de novo', 'foi');
+      }
+      $('recent').innerHTML = (d.recent||[]).map(c=>{
+        const v = c.mult==='JACKPOT' ? '<span class="v jp">💰+'+(c.won||'0')+'</span>' : c.won>0 ? '<span class="v ok">+'+c.won+'</span>' : '<span class="v nao">0</span>';
+        return '<div class="chip"><span class="n">'+c.nick+' · '+c.mult+'</span>'+v+'</div>';
+      }).join('');
+    }, 5200);
+  }
+
+  function status(){
+    fetch(API+'/api/roda/status').then(r=>r.json()).then(d=>{
+      $('pot').textContent = fmt(d.pot||0);
+      $('custo').textContent = d.spinCost;
+      $('recent').innerHTML = (d.recent||[]).map(c=>{
+        const v = c.mult==='JACKPOT' ? '<span class="v jp">💰+'+(c.won||'0')+'</span>' : c.won>0 ? '<span class="v ok">+'+c.won+'</span>' : '<span class="v nao">0</span>';
+        return '<div class="chip"><span class="n">'+c.nick+' · '+c.mult+'</span>'+v+'</div>';
+      }).join('');
+    }).catch(()=>{});
+  }
+
+  $('btnSpin').onclick = rodar;
+  fetch(API+'/api/balance/'+userId).then(r=>r.json()).then(d=>$('coins').textContent=fmt(d.balance)).catch(()=>{});
+  status();
+  setInterval(status, 5000);
+</script>
+</body>
+</html>

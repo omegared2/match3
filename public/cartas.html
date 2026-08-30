@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Batalha 1x1 de Cartas</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:system-ui,sans-serif; background:
+    radial-gradient(1000px 500px at 50% -10%, #3b2466, transparent), #170f2e; color:#fff;
+    min-height:100vh; }
+  header { padding:14px 16px 6px; display:flex; justify-content:space-between; align-items:center; }
+  header h1 { font-size:20px; } header h1 b { color:#ffd700; }
+  .pill { background:rgba(255,255,255,.1); border-radius:999px; padding:6px 12px; font-size:13px; }
+  .centro { text-align:center; }
+  .panel { padding:20px 18px; text-align:center; }
+  .btn { border:none; border-radius:14px; padding:14px 18px; font-size:16px; font-weight:800; cursor:pointer; width:100%; }
+  .btn.gold { background:linear-gradient(135deg,#ffd700,#ff9d00); color:#3a2a00; }
+  .btn.dark { background:rgba(255,255,255,.14); color:#fff; }
+  .btn:disabled { opacity:.5; }
+  .alert { padding:14px; border-radius:12px; background:rgba(255,255,255,.06); font-size:13px; color:#a99bcc; }
+  .rival { text-align:center; padding:10px 16px; }
+  .rival .nm { color:#a99bcc; font-size:12px; letter-spacing:1px; }
+  .rival .card { display:inline-flex; width:52px; height:72px; border-radius:10px; background:#2b1d52;
+    border:1px solid #472f80; align-items:center; justify-content:center; font-size:22px; font-weight:900;
+    margin:3px; color:#8b7fb0; }
+  .rival .card.secreta { background:#1d1238; color:#3d2f6b; }
+  .vs { text-align:center; font-size:14px; color:#8b7fb0; padding:4px 0; }
+  .hand { padding:14px 16px; }
+  .hand h3 { font-size:12px; color:#8b7fb0; letter-spacing:2px; margin-bottom:10px; }
+  .cards { display:flex; gap:12px; justify-content:center; }
+  .carta { width:76px; height:108px; border-radius:12px; background:linear-gradient(160deg,#3b2466,#241845);
+    border:2px solid #472f80; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-size:30px; font-weight:900; cursor:pointer; transition:.15s; position:relative; }
+  .carta:active { transform:scale(.94); }
+  .carta.usada { opacity:.15; pointer-events:none; border-style:dashed; }
+  .carta.play { border-color:#ffd700; box-shadow:0 0 18px rgba(255,215,0,.6); }
+  .carta .n { position:absolute; top:6px; left:9px; font-size:12px; color:#8b7fb0; }
+  .res { min-height:70px; text-align:center; padding:8px 16px; font-size:15px; }
+  .res .voce { color:#2ecc71; font-weight:800; }
+  .res .rival { color:#ff7878; font-weight:800; }
+  .pontos { display:flex; justify-content:center; gap:8px; padding:6px 16px; }
+  .pontos span { width:12px; height:12px; border-radius:50%; background:#3d2f6b; }
+  .pontos span.on { background:#ffd700; box-shadow:0 0 8px rgba(255,215,0,.6); }
+  .overlay { position:fixed; inset:0; background:rgba(0,0,0,.78); display:none; align-items:center;
+    justify-content:center; flex-direction:column; z-index:20; text-align:center; padding:20px; }
+  .overlay.show { display:flex; }
+  .overlay .tt { font-size:26px; font-weight:900; }
+  .overlay .sub { margin-top:8px; color:#a99bcc; }
+  .overlay .btn { max-width:260px; margin-top:18px; }
+  .mini { font-size:11px; color:#6b5f96; text-align:center; padding:0 30px 20px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🃏 <b>BATALHA DE CARTAS</b></h1>
+  <span class="pill">💰 <b id="coins">?</b> 🪙</span>
+</header>
+
+<div id="telaina" style="display:none" class="panel">
+  <h2 style="font-size:22px; margin-bottom:6px;">1x1 PvP</h2>
+  <p style="color:#a99bcc; font-size:13px; margin-bottom:14px;">3 cartas cada · melhor de 3 · quem vence leva <b id="potMostra">90%</b> do pote</p>
+  <button class="btn gold" id="btnEntrar">⚔️ Entrar na fila</button>
+</div>
+
+<div id="telafila" style="display:none" class="panel">
+  <div style="font-size:44px;">⏳</div>
+  <h2 style="font-size:18px; margin:8px 0;">Procurando adversário...</h2>
+  <div class="alert" id="filaInfo">Você já pagou a aposta — se ninguém entrar, devolvemos.</div>
+  <button class="btn dark" id="btnFila" style="margin-top:16px">Cancelar</button>
+</div>
+
+<div id="telajogo" style="display:none">
+  <div class="rival">
+    <div class="nm">RIVAL</div>
+    <div id="rivalCards"></div>
+  </div>
+  <div class="vs" id="vs">Rodada <b id="round">1</b> · Pote <b id="pot">0</b> 🪙</div>
+  <div class="pontos" id="pontos"></div>
+  <div class="res" id="res">Escolha sua carta</div>
+  <div class="hand">
+    <h3>SUA MÃO</h3>
+    <div class="cards" id="mao"></div>
+  </div>
+</div>
+
+<div class="overlay" id="fim">
+  <div class="tt" id="fimTitulo"></div>
+  <div class="sub" id="fimSub"></div>
+  <button class="btn gold" id="btnVoltar" onclick="parar(true)">Continuar</button>
+</div>
+<div class="mini">Empate devolve as apostas · sem jogo, todo mundo toma desconto nenhum 😉</div>
+
+<script>
+  const API = (location.origin === 'file://' || location.origin.indexOf('localhost') !== -1) ? 'https://match3-te1c.onrender.com' : '';
+  let userId = localStorage.getItem('match3_user') || ('player_' + Math.random().toString(36).slice(2,10));
+  localStorage.setItem('match3_user', userId);
+  const $ = id => document.getElementById(id);
+  const fmt = n => Number(n).toLocaleString('pt-BR');
+  let match = null, encerrou = false;
+
+  function mostrar(t){ ['telaina','telafila','telajogo'].forEach(i=>$(i).style.display='none'); $(t).style.display='block'; }
+
+  function entrar(){
+    fetch(API+'/api/cartas/join',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId, nick:userId})})
+      .then(r=>r.json()).then(d=>{
+        if(d.error){ alert(d.error); return; }
+        if(d.status==='queue') mostrar('telafila');
+        else if(d.status==='match'){ match=d.match; renderMatch(); }
+      }).catch(()=>alert('Sem internet'));
+  }
+
+  function renderMatch(){
+    mostrar('telajogo');
+    $('round').textContent = match.round;
+    $('pot').textContent = fmt(match.pot);
+    const rc=[]; for(let i=0;i<Math.max(0,match.rivalCardsLeft);i++) rc.push('<div class="card secreta">🂠</div>');
+    for(let i=match.rivalCardsLeft||0;i<3;i++) rc.push('<div class="card"></div>');
+    $('rivalCards').innerHTML = rc.join('');
+    $('pontos').innerHTML = [0,1,2].map(i=>'<span class="'+(i<match.scores.you?'on':'')+'"></span>').join('')
+      + '<span style="width:auto;background:none;color:#8b7fb0;font-size:11px;">·</span>'
+      + [0,1,2].map(i=>'<span class="'+(i<match.scores.rival?'on':'')+'" style="background:#ff7878"></span>').join('');
+    const av = match.myAvailable || [];
+    const avIdx = av.map(c=>c.idx);
+    $('mao').innerHTML = match.myCards.map((v,i)=>{
+      const estado = match.myPicked && match.myPicked.idx===i ? 'play' : (avIdx.includes(i) ? '' : 'usada');
+      return `<div class="carta ${estado}" data-i="${i}" data-v="${v}">${v}</div>`;
+    }).join('');
+    Array.from(document.querySelectorAll('.carta')).forEach(el=>{
+      el.onclick = ()=>{ if(match && match.phase==='pick') jogar(Number(el.dataset.i)); };
+    });
+    const r = match.lastResult;
+    if(r){
+      const t = r.roundWinner==='you' ? '😎 Você venceu a rodada!' : r.roundWinner==='rival' ? '😤 Rival venceu a rodada!' : '🤝 Empate na rodada!';
+      $('res').innerHTML = `Sua carta <b>${r.yourCard}</b> x <b>${r.rivalCard}</b> do rival<br/><span style="font-weight:900; color:${r.roundWinner==='you'?'#2ecc71':r.roundWinner==='rival'?'#ff7878':'#a99bcc'}">${t}</span>`;
+    } else {
+      $('res').textContent = match.phase==='pick' ? 'Escolha sua carta 🃏' : 'Aguardando rival jogar...';
+    }
+  }
+
+  function jogar(idx){
+    fetch(API+'/api/cartas/pick',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId, cardIdx:idx})})
+      .then(r=>r.json()).then(d=>{
+        if(d.error){ if(d.error.includes('Aguarde')) return; alert(d.error); return; }
+        match = d.match; renderMatch();
+      }).catch(()=>{});
+  }
+
+  function status(){
+    if(encerrou) return;
+    fetch(API+'/api/cartas/status?userId='+encodeURIComponent(userId))
+      .then(r=>r.json()).then(d=>{
+        if(d.inMatch){ match=d.match; renderMatch();
+          if(d.match.phase==='winner'||d.match.phase==='draw') fimPartida(d.match);
+        }
+        else if(d.inQueue) mostrar('telafila');
+        else if($('telajogo').style.display==='none' && $('telafila').style.display==='none') mostrar('telaina');
+      }).catch(()=>{});
+  }
+
+  function fimPartida(m){
+    encerrou=true;
+    $('fim').classList.add('show');
+    if(m.phase==='draw'){ $('fimTitulo').textContent='🤝 Empate!'; $('fimSub').textContent='Suas apostas foram devolvidas.'; }
+    else if(m.winner===userId){ $('fimTitulo').textContent='🏆 VOCÊ VENCEU!'; $('fimSub').textContent='+'+fmt(m.won)+' moedas!'; }
+    else { $('fimTitulo').textContent='😔 Derrota'; $('fimSub').textContent='O rival levou o pote batalha. Tenta de novo!'; }
+    balance();
+  }
+
+  function parar(){
+    $('fim').classList.remove('show');
+    encerrou=false; match=null; mostrar('telaina');
+  }
+
+  function balance(){ fetch(API+'/api/balance/'+userId).then(r=>r.json()).then(d=>$('coins').textContent=fmt(d.balance)).catch(()=>{}); }
+  $('btnEntrar').onclick = entrar;
+  $('btnFila').onclick = parar;
+
+  balance();
+  status();
+  setInterval(status, 1400);
+</script>
+</body>
+</html>

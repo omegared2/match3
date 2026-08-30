@@ -7,6 +7,10 @@ const db = require('./db');
 const arena = require('./arena');
 const rpg = require('./rpg');
 const bingo = require('./bingo');
+const roda = require('./roda');
+const cartas = require('./cartas');
+const loteria = require('./loteria');
+const turbo = require('./turbo');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -110,6 +114,10 @@ app.get('/batalha', (req, res) => res.sendFile(path.join(__dirname, 'public', 'a
 app.get('/aventura', (req, res) => res.sendFile(path.join(__dirname, 'public', 'aventura.html')));
 app.get('/jogos', (req, res) => res.sendFile(path.join(__dirname, 'public', 'jogos.html')));
 app.get('/bingo', (req, res) => res.sendFile(path.join(__dirname, 'public', 'bingo.html')));
+app.get('/roda', (req, res) => res.sendFile(path.join(__dirname, 'public', 'roda.html')));
+app.get('/cartas', (req, res) => res.sendFile(path.join(__dirname, 'public', 'cartas.html')));
+app.get('/loteria', (req, res) => res.sendFile(path.join(__dirname, 'public', 'loteria.html')));
+app.get('/turbo', (req, res) => res.sendFile(path.join(__dirname, 'public', 'turbo.html')));
 app.get('/divulgar', (req, res) => res.sendFile(path.join(__dirname, 'public', 'divulgar.html')));
 
 // -------------------------------------------------------
@@ -332,6 +340,128 @@ app.get('/api/admin/bingo', (req, res) => {
 });
 
 // -------------------------------------------------------
+// 8.6) RODA DA FORTUNA
+// -------------------------------------------------------
+app.get('/api/roda/status', (req, res) => res.json(roda.status()));
+
+app.post('/api/roda/spin', async (req, res) => {
+  try {
+    const { userId, nick } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
+    const r = await roda.spin(db, userId, nick);
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    console.error('Erro ao girar a roda:', err.message);
+    res.status(500).json({ error: 'Erro ao girar a roda' });
+  }
+});
+
+app.get('/api/admin/roda', (req, res) => {
+  if (!adminKeyOk(req)) return res.status(401).json({ error: 'chave inválida' });
+  res.json(roda.status());
+});
+
+// -------------------------------------------------------
+// 8.7) BATALHA 1x1 DE CARTAS (PvP)
+// -------------------------------------------------------
+app.get('/api/cartas/status', (req, res) => {
+  if (req.query.userId) res.json(cartas.status(String(req.query.userId)));
+  else res.json(cartas.snapshot());
+});
+
+app.post('/api/cartas/join', async (req, res) => {
+  try {
+    const { userId, nick } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
+    const r = await cartas.join(db, userId, nick);
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    console.error('Erro ao entrar nas cartas:', err.message);
+    res.status(500).json({ error: 'Erro ao entrar nas cartas' });
+  }
+});
+
+app.post('/api/cartas/pick', async (req, res) => {
+  try {
+    const { userId, cardIdx } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
+    const r = cartas.pick(db, userId, Number(cardIdx));
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    console.error('Erro ao jogar carta:', err.message);
+    res.status(500).json({ error: 'Erro ao jogar carta' });
+  }
+});
+
+app.get('/api/admin/cartas', (req, res) => {
+  if (!adminKeyOk(req)) return res.status(401).json({ error: 'chave inválida' });
+  res.json(cartas.snapshot());
+});
+
+// -------------------------------------------------------
+// 8.8) LOTERIA DO SITE (número 00-99)
+// -------------------------------------------------------
+app.get('/api/loteria/status', (req, res) => res.json(loteria.status(String(req.query.userId || ''))));
+
+app.post('/api/loteria/buy', async (req, res) => {
+  try {
+    const { userId, num } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
+    const r = await loteria.buy(db, userId, num);
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    console.error('Erro na loteria:', err.message);
+    res.status(500).json({ error: 'Erro na loteria' });
+  }
+});
+
+// -------------------------------------------------------
+// 8.9) MODO TURBO (multiplicador estilo crash)
+// -------------------------------------------------------
+app.get('/api/turbo/status', (req, res) => res.json(turbo.status(String(req.query.userId || ''))));
+
+app.post('/api/turbo/bet', async (req, res) => {
+  try {
+    const { userId, autoCash } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
+    const r = await turbo.bet(db, userId, autoCash);
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    console.error('Erro no turbo:', err.message);
+    res.status(500).json({ error: 'Erro no turbo' });
+  }
+});
+
+app.post('/api/turbo/cashout', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
+    const r = await turbo.cashOut(db, userId, false);
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    console.error('Erro no resgate:', err.message);
+    res.status(500).json({ error: 'Erro no resgate' });
+  }
+});
+
+app.get('/api/admin/jogos', (req, res) => {
+  if (!adminKeyOk(req)) return res.status(401).json({ error: 'chave inválida' });
+  res.json({
+    bingo: { jackpot: bingo.status().jackpot, cardsSold: bingo.status().cardsSold },
+    roda: roda.status(),
+    cartas: cartas.snapshot(),
+    loteria: loteria.status(),
+    turbo: turbo.status()
+  });
+});
+
+// -------------------------------------------------------
 // 9) MUNDO DO CAVALEIRO (RPG com mapa, NPCs e classes)
 // -------------------------------------------------------
 app.get('/api/char/:userId', async (req, res) => {
@@ -491,6 +621,18 @@ db.initDb().then(() => {
       notifyTelegram(`📈 BINGO: o pote chegou a ${info.jackpot} moedas!`);
     }
   };
+  roda.onEvent = (ev, info) => {
+    if (ev === 'jackpot') notifyTelegram(`🎡 JACKPOT NA RODA! ${info.nick} levou ${info.amount} moedas!`);
+  };
+  cartas.startLoop(db);
+  cartas.onEvent = (ev, info) => {
+    if (ev === 'winner') notifyTelegram(`🃏 Duelo! ${info.nick} venceu 1x1 e levou ${info.amount} moedas!`);
+  };
+  loteria.startLoop(db);
+  loteria.onEvent = (ev, info) => {
+    if (ev === 'winner') notifyTelegram(`🍀 Loteria! Saiu o ${info.num} e ${info.winners} bilhete(s) acertou(aram). Prêmio de ${info.amount} moedas!`);
+  };
+  turbo.startLoop(db);
   app.listen(PORT, () => {
     console.log(`✅ Servidor rodando em http://localhost:${PORT}`);
     console.log(`   Jogo servido de: ${GAME_DIR}`);

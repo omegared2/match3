@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Loteria do Site</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:system-ui,sans-serif; background:
+    radial-gradient(1000px 500px at 50% -10%, #3b2466, transparent), #170f2e; color:#fff;
+    min-height:100vh; }
+  header { padding:14px 16px 6px; display:flex; justify-content:space-between; align-items:center; }
+  header h1 { font-size:20px; } header h1 b { color:#ffd700; }
+  .pill { background:rgba(255,255,255,.1); border-radius:999px; padding:6px 12px; font-size:13px; }
+  .draw { text-align:center; padding:14px 16px 2px; }
+  .draw .lbl { font-size:12px; color:#a99bcc; letter-spacing:2px; }
+  .draw .count { font-size:32px; font-weight:900; color:#ffd700; }
+  .numsel { padding:16px; text-align:center; }
+  .numsel .t { font-size:12px; color:#8b7fb0; letter-spacing:2px; margin-bottom:8px; }
+  .digits { display:flex; gap:10px; justify-content:center; margin-bottom:14px; }
+  .digit { background:#241845; border:1px solid #472f80; border-radius:14px; padding:12px 0;
+    display:flex; justify-content:space-evenly; align-items:center; width:112px; }
+  .digit button { background:rgba(255,255,255,.08); border:none; color:#fff; font-size:20px; font-weight:900;
+    width:34px; height:34px; border-radius:9px; cursor:pointer; }
+  .digit b { font-size:22px; min-width:26px; }
+  .btn { border:none; border-radius:14px; padding:14px 18px; font-size:16px; font-weight:800; cursor:pointer; width:100%; }
+  .btn.gold { background:linear-gradient(135deg,#ffd700,#ff9d00); color:#3a2a00; }
+  .btn:disabled { opacity:.45; }
+  .panel { padding:0 16px; }
+  .meus { padding:10px 16px; }
+  .meus h3 { font-size:12px; color:#8b7fb0; letter-spacing:2px; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+  .chip { background:rgba(255,255,255,.08); border-radius:9px; padding:6px 10px; font-size:13px; }
+  .hists { padding:6px 16px 24px; }
+  .hists h3 { font-size:12px; color:#8b7fb0; letter-spacing:2px; }
+  .hist { display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,.05);
+    border-radius:10px; padding:9px 12px; margin-top:7px; font-size:13px; }
+  .hist .n { font-size:20px; font-weight:900; color:#ffd700; }
+  .hist .w { color:#2ecc71; font-weight:800; }
+  .mini { font-size:11px; color:#6b5f96; text-align:center; padding:0 30px 20px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🍀 <b>LOTERIA</b></h1>
+  <span class="pill">💰 <b id="coins">?</b> 🪙</span>
+</header>
+
+<div class="draw">
+  <div class="lbl">PRÓXIMO SORTEIO</div>
+  <div class="count" id="count">--:--</div>
+</div>
+
+<div class="numsel">
+  <div class="t">ESCOLHA SEU NÚMERO</div>
+  <div class="digits">
+    <div class="digit">
+      <button onclick="mex(-10)">−</button><b id="d1">0</b><button onclick="mex(10)">+</button>
+    </div>
+    <div class="digit">
+      <button onclick="mex(-1)">−</button><b id="d2">0</b><button onclick="mex(1)">+</button>
+    </div>
+  </div>
+  <button class="btn gold" id="btnComprar">🎟️ Comprar bilhete · <span id="custo">20</span> 🪙</button>
+  <div class="mini" style="margin-top:6px">Acertou? Leva <b id="mult">80x</b>! Sorteios a cada poucos minutos</div>
+</div>
+
+<div class="meus" id="meus"></div>
+
+<div class="hists">
+  <h3>ÚLTIMOS SORTEADOS</h3>
+  <div id="hists"></div>
+</div>
+
+<script>
+  const API = (location.origin === 'file://' || location.origin.indexOf('localhost') !== -1) ? 'https://match3-te1c.onrender.com' : '';
+  let userId = localStorage.getItem('match3_user') || ('player_' + Math.random().toString(36).slice(2,10));
+  localStorage.setItem('match3_user', userId);
+  let num = 42;
+  const $ = id => document.getElementById(id);
+  const fmt = n => Number(n).toLocaleString('pt-BR');
+  function tempo(ms){ const s=Math.max(0,Math.ceil(ms/1000)); return ('0'+Math.floor(s/60)).slice(-2)+':'+('0'+s%60).slice(-2); }
+  function pintar(){ const n=('0'+String(num)).slice(-2); $('d1').textContent=n[0]; $('d2').textContent=n[1]; }
+  function mex(d){ num=((num+d)%100+100)%100; pintar(); }
+  pintar();
+
+  function comprar(){
+    fetch(API+'/api/loteria/buy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId, num})})
+      .then(r=>r.json()).then(d=>{
+        if(d.error){ alert(d.error); return; }
+        $('coins').textContent=fmt(d.balance);
+        status();
+      }).catch(()=>alert('Sem internet'));
+  }
+  $('btnComprar').onclick = comprar;
+
+  function status(){
+    fetch(API+'/api/loteria/status?userId='+encodeURIComponent(userId))
+      .then(r=>r.json()).then(d=>{
+        $('count').textContent = tempo(d.countdownMs);
+        $('custo').textContent = d.cost;
+        $('mult').textContent = d.mult+'x';
+        const mts = d.myTickets || [];
+        $('meus').innerHTML = mts.length
+          ? '<h3>SEUS BILHETES</h3><div class="chips">'+mts.map(t=>'<span class="chip">#'+('0'+String(t.num)).slice(-2)+'</span>').join('')+'</div>'
+          : '';
+        $('hists').innerHTML = (d.lastDraws||[]).map(h=>{
+          const jackpot = h.winners>0;
+          return '<div class="hist"><div class="n">'+h.num+'</div><div class="'+(jackpot?'w':'')+'">'+(jackpot? h.winners+' ganhador'+(h.winners>1?'es':'')+' · +'+fmt(h.prize) : 'não saiu')+'</div></div>';
+        }).join('') || '<div class="mini">Nenhum sorteio ainda</div>';
+      }).catch(()=>{});
+  }
+  fetch(API+'/api/balance/'+userId).then(r=>r.json()).then(d=>$('coins').textContent=fmt(d.balance)).catch(()=>{});
+  status();
+  setInterval(status, 1500);
+</script>
+</body>
+</html>
