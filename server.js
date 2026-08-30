@@ -338,6 +338,38 @@ app.post('/api/battle/action', async (req, res) => {
 });
 
 // -------------------------------------------------------
+// 9.1) ADMIN (usado pelo bot do Telegram) — exige ADMIN_KEY
+// -------------------------------------------------------
+function adminKeyOk(req) {
+  return req.query.key && req.query.key === process.env.ADMIN_KEY;
+}
+
+app.get('/api/admin/stats', async (req, res) => {
+  if (!adminKeyOk(req)) return res.status(401).json({ error: 'chave inválida' });
+  try {
+    res.json(await db.dbAdminStats());
+  } catch (err) {
+    console.error('Erro admin stats:', err.message);
+    res.status(500).json({ error: 'Erro ao buscar estatísticas' });
+  }
+});
+
+app.get('/api/admin/user/:userId', async (req, res) => {
+  if (!adminKeyOk(req)) return res.status(401).json({ error: 'chave inválida' });
+  try {
+    const userId = req.params.userId;
+    const [bal, p] = await Promise.all([
+      db.dbGetUser(userId),
+      rpg.profile(db, userId)
+    ]);
+    res.json({ balance: bal.balance, profile: p });
+  } catch (err) {
+    console.error('Erro admin user:', err.message);
+    res.status(500).json({ error: 'Erro ao buscar jogador' });
+  }
+});
+
+// -------------------------------------------------------
 // 6) Bônus por vitória (tela de vitória)
 //    POST /api/victory-bonus { userId }
 // -------------------------------------------------------

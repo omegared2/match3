@@ -33,6 +33,9 @@ async function initDb() {
       )`
     );
     await pool.query(
+      `ALTER TABLE payments ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now()`
+    );
+    await pool.query(
       `CREATE TABLE IF NOT EXISTS characters (
         id TEXT PRIMARY KEY,
         data JSONB NOT NULL
@@ -156,6 +159,46 @@ async function dbSetCharacter(id, data) {
   );
 }
 
+// Estatísticas gerais (para o bot/administrador)
+async function dbAdminStats() {
+  if (mode === 'memory') {
+    return {
+      users: memUsers.size,
+      chars: memChars.size,
+      payments24h: 0,
+      coins24h: 0,
+      top: [...memUsers.entries()]
+        .map(([id, u]) => ({ id, balance: u.balance }))
+        .sort((a, b) => b.balance - a.balance)
+        .slice(0, 5)
+    };
+  }
+  const u = await pool.query('SELECT count(*)::int AS c FROM users');
+  const c = await pool.query('SELECT count(*)::int AS c FROM characters');
+  const p = await pool.query(
+    `SELECT count(*)::int AS c, COALESCE(sum(coins),0)::int AS s
+     FROM payments WHERE status='approved' AND created_at >= now() - interval '1 day'`
+  );
+  const top = await pool.query(
+    `SELECT u.id, u.balance, ch.data
+     FROM users u LEFT JOIN characters ch ON ch.id = u.id
+     ORDER BY u.balance DESC LIMIT 5`
+  );
+  return {
+    users: u.rows[0].c,
+    chars: c.rows[0].c,
+    payments24h: p.rows[0].c,
+    coins24h: p.rows[0].s,
+    top: top.rows.map(r => ({
+      id: r.id,
+      balance: r.balance,
+      level: r.data ? r.data.level : null,
+      phase: r.data ? r.data.phase : null,
+      wins: r.data ? r.data.wins : 0
+    }))
+  };
+}
+
 module.exports = {
   initDb,
   dbGetUser,
@@ -166,5 +209,6 @@ module.exports = {
   dbApprovePayment,
   dbGetCharacter,
   dbSetCharacter,
+  dbAdminStats,
   defaultChar
 };
