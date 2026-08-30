@@ -14,7 +14,7 @@ const API = 'https://api.mercadopago.com';
  */
 async function createPayment(pack, baseUrl) {
   if (!ACCESS_TOKEN) {
-    throw new Error('MP_ACCESS_TOKEN não configurado');
+    throw new Error('MP_ACCESS_TOKEN APP_USR-2183579624596817-083008-f649747a8c025ebae11fc9f19ba3e0ee-79228648 ');
   }
 
   const webhookUrl = `${baseUrl}/api/webhook/mp`;
@@ -44,7 +44,7 @@ async function createPayment(pack, baseUrl) {
  */
 async function getStatus(paymentId) {
   if (!ACCESS_TOKEN) {
-    throw new Error('MP_ACCESS_TOKEN não configurado no arquivo .env');
+    throw new Error('MP_ACCESS_TOKEN APP_USR-2183579624596817-083008-f649747a8c025ebae11fc9f19ba3e0ee-79228648 .env');
   }
 
   const res = await axios.get(`${API}/v1/payments/${paymentId}`, {
