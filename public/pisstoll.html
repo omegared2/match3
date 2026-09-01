@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Pisstoll - Tiro ao Alvo</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { background:#10141f; color:#fff; font-family:'Segoe UI',system-ui,sans-serif; overflow:hidden; height:100vh; user-select:none; }
+  #hud { position:fixed; top:0; left:0; right:0; padding:10px 12px; background:rgba(8,10,18,.92); backdrop-filter:blur(4px); z-index:50; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #232a3f; }
+  #hud .c { font-size:13px; font-weight:600; }
+  #hud .c b { color:#ffd75e; }
+  #hud .t { font-size:11px; color:#8e96a8; text-align:right; }
+  #hud .t b { color:#fff; font-size:16px; }
+
+  #canvas { position:fixed; top:0; left:0; z-index:10; touch-action:none; }
+  #caixa { position:fixed; inset:0; z-index:40; display:flex; align-items:center; justify-content:center; background:rgba(10,13,22,.98); }
+  #caixa.oculta { display:none; }
+  .painel { width:min(92vw,400px); background:#171d2e; border:1px solid #2a3350; border-radius:14px; padding:22px; text-align:center; max-height:90vh; overflow-y:auto; }
+  .painel h1 { font-size:26px; color:#ffd75e; letter-spacing:1px; margin-bottom:2px; }
+  .painel h1 small { display:block; font-size:11px; color:#8e96a8; letter-spacing:2px; }
+  .painel .saldo { margin:14px 0; font-size:15px; background:#10151f; border:1px solid #232a3f; border-radius:10px; padding:12px; }
+  .painel .saldo b { color:#ffd75e; font-size:20px; }
+  .btn { display:block; width:100%; margin:8px 0; padding:13px; border:none; border-radius:10px; background:#2d3a54; color:#fff; font-size:15px; font-weight:700; cursor:pointer; }
+  .btn.gold { background:#ffd75e; color:#201a00; }
+  .btn.green { background:#24c06b; color:#06210f; }
+  .btn.red { background:#c03a3a; color:#fff; }
+  .btn:active { transform:scale(.97); opacity:.9; }
+  .item { display:flex; justify-content:space-between; align-items:center; background:#10151f; border:1px solid #232a3f; border-radius:10px; padding:10px 12px; margin:8px 0; text-align:left; }
+  .item .nome { font-weight:700; font-size:14px; }
+  .item .desc { font-size:11px; color:#8e96a8; }
+  .item .preco { font-weight:800; color:#ffd75e; font-size:15px; }
+  .item.comprado { opacity:.5; }
+  .mini { font-size:12px; color:#8e96a8; }
+  hr { border:none; border-top:1px solid #232a3f; margin:12px 0; }
+  .faseInfo { position:fixed; top:52px; left:0; right:0; z-index:30; text-align:center; font-size:14px; font-weight:700; padding:3px; pointer-events:none; }
+  #overlay { position:fixed; inset:0; z-index:45; background:rgba(0,0,0,.65); display:none; align-items:center; justify-content:center; }
+  #overlay.ativo { display:flex; }
+  #toast { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:60; background:#ffd75e; color:#201a00; font-weight:800; padding:10px 18px; border-radius:10px; display:none; font-size:16px; box-shadow:0 4px 20px #000; }
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <div class="c">🔫 PISSTOLL <b id="hSaldo">0</b></div>
+  <div class="t">Fase <b id="hFase">1</b><br><span id="hAlvos">5</span> alvos · <span id="hTempo">60</span>s</div>
+</div>
+
+<div id="overlay"></div>
+<div id="toast"></div>
+
+<canvas id="canvas"></canvas>
+<div class="faseInfo" id="faseInfo"></div>
+
+<div id="caixa">
+  <div class="painel" id="pMenu">
+    <h1>PISSTOLL<small>TIRO AO ALVO</small></h1>
+    <div class="saldo">💎 Seu saldo: <b id="mSaldo">0</b></div>
+    <button class="btn gold" onclick="comecarJogo()">▶ JOGAR (fase 1 · 5 alvos · 60s)</button>
+    <button class="btn" onclick="abrirLoja()">🛒 LOJA DE ARMAS</button>
+    <button class="btn green" onclick="verAnuncio()">🎁 ANÚNCIO → PRÊSENTE</button>
+    <hr>
+    <button class="btn" onclick="fecharMenu()">🔁 Testar sem login</button>
+    <div class="mini">🎯 Toque nos alvos para atirar.<br>⚔️ Rifle = +2 pontos por alvo · Minigun = +4.</div>
+  </div>
+
+  <div class="painel" id="pLoja" style="display:none">
+    <h1>🛒 LOJA</h1>
+    <div class="saldo">💎 Saldo: <b id="lSaldo">0</b></div>
+    <div id="listaLoja"></div>
+    <button class="btn" onclick="voltarMenu()">← Voltar</button>
+  </div>
+
+  <div class="painel" id="pFim" style="display:none">
+    <h1 id="fimTitulo">FIM DE JOGO</h1>
+    <div class="saldo">🏆 Pontos: <b id="fimPontos">0</b><br>💎 Créditos ganhos: <b id="fimCreds">0</b></div>
+    <div id="fimRecorde" class="mini"></div>
+    <button class="btn gold" onclick="rejogar()">▶ JOGAR DE NOVO</button>
+    <button class="btn" onclick="voltarMenu()">← Menu</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// CONFIGURAÇÃO DO JOGO
+// ============================================================
+const CFG = {
+  tempoRodada: 60,
+  ciclosAlvos: [5, 10, 20],
+  creditosAnuncio: 25,
+  vidasIniciais: 3,
+  armas: [
+    { id: 'pistola',  nome: 'Pistola básica',   desc: '1 ponto por alvo',       custo: 0,   pts: 1,  cor: '#e74c3c', tam: 34 },
+    { id: 'rifle',    nome: 'Rifle Precision',   desc: '+2 pontos por alvo',     custo: 500, pts: 3,  cor: '#ffa726', tam: 32 },
+    { id: 'minigun',  nome: 'Minigun X',         desc: '+4 pontos por alvo',     custo: 1500, pts: 5,  cor: '#5cc8ff', tam: 30 }
+  ],
+  creditosPorAlvo: 2
+};
+
+let J = {
+  user: null,
+  saldo: 0,
+  armaId: 'pistola',
+  armaIdx: 0,
+  fase: 1,
+  vidas: 3,
+  pontos: 0,
+  creds: 0,
+  tempo: CFG.tempoRodada,
+  alvos: [],
+  aTempo: null,
+  coroutine: false,
+  recorde: +(localStorage.getItem('pisstoll_record') || 0)
+};
+
+const $ = id => document.getElementById(id);
+const canvas = $('canvas');
+const ctx = canvas.getContext('2d');
+
+function resize() {
+  canvas.width = innerWidth;
+  canvas.height = innerHeight - 48;
+  canvas.style.width = innerWidth + 'px';
+  canvas.style.height = (innerHeight - 48) + 'px';
+}
+addEventListener('resize', resize); resize();
+
+const userId = localStorage.getItem('match3_user') || 'guest_pisstoll';
+J.user = userId;
+
+function lerSaldo() {
+  fetch('/api/balance/' + encodeURIComponent(userId))
+    .then(r => r.json())
+    .then(d => {
+      if (typeof d.balance === 'number') {
+        J.saldo = d.balance;
+        $('hSaldo').innerText = d.balance;
+        $('mSaldo').innerText = d.balance;
+        if ($('pLoja').style.display !== 'none') $('lSaldo').innerText = d.balance;
+      }
+    }).catch(() => {});
+}
+lerSaldo();
+setInterval(lerSaldo, 4000);
+
+// ============================================================
+// TELAS / MENUS
+// ============================================================
+function mostrar(el) { ['pMenu','pLoja','pFim'].forEach(id => $(id).style.display = id === el ? 'block' : 'none'); $('caixa').classList.remove('oculta'); }
+function fecharMenu() { $('caixa').classList.add('oculta'); jogar(); }
+function voltarMenu() { mostrar('pMenu'); lerSaldo(); }
+
+function armas() {
+  const loja = $('listaLoja');
+  loja.innerHTML = '';
+  CFG.armas.forEach((a, i) => {
+    const d = document.createElement('div');
+    d.className = 'item';
+    const comprado = J.armaIdx >= i;
+    d.innerHTML = `<div><div class="nome">${a.nome}</div><div class="desc">${a.desc}</div></div><div class="preco">${comprado ? '✔' : '💎 ' + a.custo}</div>`;
+    if (!comprado) {
+      d.style.cursor = 'pointer';
+      d.onclick = () => comprarArma(i);
+    }
+    loja.appendChild(d);
+  });
+}
+function abrirLoja() { mostrar('pLoja'); armas(); }
+
+function comprarArma(i) {
+  const a = CFG.armas[i];
+  if (i <= J.armaIdx) return;
+  if (J.saldo < a.custo) { toast('💎 Saldo insuficiente!'); return; }
+  fetch('/api/spend', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId, cost: a.custo }) })
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) { toast('❌ ' + d.error); return; }
+      J.saldo = d.balance;
+      J.armaIdx = i;
+      J.armaId = a.id;
+      toast('✅ ' + a.nome + ' equipada!');
+      $('lSaldo').innerText = d.balance;
+      $('mSaldo').innerText = d.balance;
+      armas();
+    })
+    .catch(() => toast('❌ Erro na compra'));
+}
+
+function toast(t) {
+  const e = $('toast'); e.innerText = t; e.style.display = 'block';
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => e.style.display = 'none', 1600);
+}
+
+function verAnuncio() {
+  $('overlay').innerHTML = '<div class="painel"><h1>📺 ANÚNCIO</h1><div class="saldo">Assista até o final para ganhar<br>🎁 <b style="font-size:22px">+' + CFG.creditosAnuncio + ' créditos</b><br>(prêsente)</div><button class="btn gold" onclick="fimAnuncio(true)">▶ ASSISTI</button><button class="btn red" onclick="fimAnuncio(false)">✖ PULOU = sem prêsente</button></div>';
+  $('overlay').classList.add('ativo');
+}
+function fimAnuncio(assistiu) {
+  $('overlay').classList.remove('ativo');
+  if (!assistiu) { toast('😞 Sem prêsente'); return; }
+  fetch('/api/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId, amount: CFG.creditosAnuncio }) })
+    .then(r => r.json())
+    .then(d => {
+      J.saldo = d.balance;
+      $('mSaldo').innerText = d.balance;
+      toast('🎁 Prêsente! +' + CFG.creditosAnuncio + ' 💎');
+    })
+    .catch(() => toast('❌ Erro'));
+}
+
+// ============================================================
+// JOGO
+// ============================================================
+function comecarJogo() {
+  J.fase = 1; J.vidas = CFG.vidasIniciais; J.pontos = 0; J.creds = 0;
+  $('caixa').classList.add('oculta');
+  rodada();
+}
+
+function rejogar() { comecarJogo(); }
+
+function alvosDaFase(f) {
+  const ciclo = CFG.ciclosAlvos[(f - 1) % 3];
+  const extra = Math.floor((f - 1) / 3) * 5;
+  return Math.min(ciclo + extra, 40);
+}
+
+function rodada() {
+  if (J.vidas <= 0) return fimDeJogo();
+  J.tempo = CFG.tempoRodada;
+  const qtd = alvosDaFase(J.fase);
+  $('hFase').innerText = J.fase;
+  $('hAlvos').innerText = qtd;
+  $('hTempo').innerText = J.tempo;
+  $('faseInfo').innerText = '';
+
+  J.alvos = [];
+  for (let i = 0; i < qtd; i++) spawnAlvo();
+
+  clearInterval(J.aTempo);
+  J.aTempo = setInterval(() => {
+    J.tempo--;
+    $('hTempo').innerText = J.tempo;
+    if (J.tempo <= 0) {
+      clearInterval(J.aTempo);
+      perdeVida();
+    }
+  }, 1000);
+  desenha();
+}
+
+function spawnAlvo() {
+  const a = CFG.armas[J.armaIdx];
+  const tam = a.tam + (Math.floor((J.fase - 1) / 3) * -1 * 2);
+  const x = tam + Math.random() * (canvas.width - tam * 2);
+  const y = tam + Math.random() * (canvas.height - tam * 2);
+  J.alvos.push({ x, y, tam: Math.max(tam, 18), ativo: true });
+}
+
+function atirar(e) {
+  if (!$('caixa').classList.contains('oculta')) return;
+  const tx = e.clientX || (e.touches && e.touches[0].clientX);
+  const ty = e.clientY || (e.touches && e.touches[0].clientY);
+  if (tx === undefined) return;
+
+  for (let i = 0; i < J.alvos.length; i++) {
+    const a = J.alvos[i];
+    if (!a.ativo) continue;
+    const dx = tx - a.x, dy = ty - a.y;
+    if (dx * dx + dy * dy <= (a.tam + 10) * (a.tam + 10)) {
+      a.ativo = false;
+      const pts = CFG.armas[J.armaIdx].pts;
+      J.pontos += pts;
+      const resto = verificaRodada();
+      desenha();
+      if (resto) break;
+      return;
+    }
+  }
+}
+
+function verificaRodada() {
+  const restantes = J.alvos.filter(a => a.ativo).length;
+  if (restantes === 0) {
+    clearInterval(J.aTempo);
+    const ganho = J.alvos.length * CFG.creditosPorAlvo;
+    J.creds += ganho;
+    const tempoBonus = Math.max(J.tempo, 0);
+    if (!J.coroutine) {
+      J.coroutine = true;
+      setTimeout(() => {
+        J.coroutine = false;
+        J.fase++;
+        rodada();
+      }, 700);
+    }
+    $('faseInfo').innerText = '✅ Fase ' + J.fase + ' concluída! +' + ganho + ' 💎 (+' + tempoBonus + 's bônus)';
+    return true;
+  }
+  return false;
+}
+
+function perdeVida() {
+  J.vidas--;
+  const restantes = J.alvos.filter(a => a.ativo).length;
+  J.pontos += restantes;
+  $('faseInfo').innerText = J.vidas > 0 ? '⏰ Tempo esgotado! ' + J.vidas + ' viva(s) restante(s)' : '';
+  if (J.vidas <= 0) {
+    fimDeJogo();
+  } else {
+    rodada();
+  }
+}
+
+function fimDeJogo() {
+  clearInterval(J.aTempo);
+  // Credita os créditos ganhos no saldo real
+  fetch('/api/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId, amount: J.creds }) })
+    .then(r => r.json())
+    .then(d => { if (typeof d.balance === 'number') J.saldo = d.balance; })
+    .catch(() => {});
+
+  const novoRecorde = J.pontos > J.recorde;
+  if (novoRecorde) { J.recorde = J.pontos; localStorage.setItem('pisstoll_record', J.recorde); }
+  $('fimTitulo').innerText = novoRecorde ? '🏆 NOVO RECORDE' : 'FIM DE JOGO';
+  $('fimPontos').innerText = J.pontos;
+  $('fimCreds').innerText = J.creds + ' 💎 adicionados ao saldo';
+  $('fimRecorde').innerText = '🏅 Recorde: ' + J.recorde + ' pontos';
+  mostrar('pFim');
+  lerSaldo();
+}
+
+// ============================================================
+// DESENHO
+// ============================================================
+function desenha() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#10141f';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const a = CFG.armas[J.armaIdx];
+  J.alvos.forEach(alvo => {
+    if (!alvo.ativo) return;
+    ctx.beginPath();
+    ctx.arc(alvo.x, alvo.y, alvo.tam, 0, Math.PI * 2);
+    ctx.fillStyle = a.cor;
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#fff';
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(alvo.x, alvo.y, alvo.tam * 0.45, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+  });
+  ctx.fillStyle = 'rgba(255,255,255,.5)';
+  ctx.font = '12px monospace';
+  ctx.fillText('Fase ' + J.fase + ' · 💥 arma: ' + a.nome + ' · ❤️ x' + J.vidas, 10, canvas.height - 8);
+}
+setInterval(desenha, 50);
+
+// input
+addEventListener('pointerdown', atirar);
+addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+
+document.addEventListener('contextmenu', e => e.preventDefault());
+</script>
+</body>
+</html>

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Gatinho</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:system-ui,sans-serif; background:
+    radial-gradient(1000px 500px at 50% -10%, #2b3a2a, transparent), #141b14; color:#fff;
+    min-height:100vh; text-align:center; }
+  header { padding:14px 16px 6px; display:flex; justify-content:space-between; align-items:center; }
+  header h1 { font-size:22px; } header h1 b { color:#7cd47c; }
+  .pill { background:rgba(255,255,255,.1); border-radius:999px; padding:6px 12px; font-size:13px; }
+  .tabs { display:flex; gap:8px; padding:10px 16px 4px; }
+  .tab { flex:1; border:none; border-radius:12px; padding:10px; font-size:14px; font-weight:700; cursor:pointer; background:rgba(255,255,255,.12); color:#fff; }
+  .tab.on { background:linear-gradient(135deg,#4ade80,#16a34a); color:#06280f; }
+  .panel { padding:12px 16px; }
+  .hidden { display:none; }
+
+  /* máquina */
+  .slot { display:flex; gap:8px; justify-content:center; margin:16px auto; width:min(320px,90vw); }
+  .reel { width:88px; height:120px; background:#0a120a; border:3px solid #555; border-radius:14px;
+    display:flex; flex-direction:column; justify-content:center; align-items:center; font-size:60px;
+    box-shadow:inset 0 0 30px rgba(0,0,0,.6); position:relative; overflow:hidden; }
+  .mascote { font-size:70px; line-height:1; margin:4px 0; filter:drop-shadow(0 0 10px rgba(124,212,124,.5)); }
+  .spin-btn { width:min(300px,86vw); border:none; border-radius:18px; padding:18px; font-size:20px; font-weight:900;
+    background:linear-gradient(135deg,#ffd700,#ff9d00); color:#3a2a00; cursor:pointer; margin:10px auto; display:block; }
+  .spin-btn:disabled { opacity:.5; }
+  .msg { min-height:24px; font-size:16px; padding:6px 16px; font-weight:700; }
+  .msg.bom { color:#4ade80; } .msg.foi { color:#ff7878; }
+  .mini { font-size:12px; color:#7a9a7a; padding:0 30px; }
+
+  /* vila */
+  .vlvl { font-size:13px; color:#9bb89b; padding:4px 0; }
+  .prog { background:rgba(255,255,255,.1); border-radius:999px; height:10px; margin:8px auto; width:min(320px,86vw); overflow:hidden; }
+  .prog i { display:block; height:100%; background:linear-gradient(90deg,#4ade80,#16a34a); width:0; transition:width .4s; }
+  .bld { background:rgba(255,255,255,.07); border-radius:14px; padding:14px; margin:8px auto; width:min(320px,86vw); }
+  .bld .e { font-size:50px; }
+  .bld .nome { font-size:16px; font-weight:700; }
+  .bld .custo { font-size:13px; color:#ffd700; margin:4px 0; }
+  .bld button { border:none; border-radius:10px; padding:10px 18px; font-size:15px; font-weight:800; cursor:pointer;
+    background:linear-gradient(135deg,#ffd700,#ff9d00); color:#3a2a00; }
+  .bld button:disabled { opacity:.5; }
+  .done { background:rgba(74,222,128,.15) !important; border:1px solid #4ade80; }
+  .done .nome { color:#4ade80; }
+
+  .recent { padding:6px 16px 26px; }
+  .recent h3 { font-size:12px; color:#7a9a7a; letter-spacing:2px; margin-bottom:8px; }
+  .chips { display:flex; flex-direction:column; gap:6px; }
+  .chip { display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,.06); border-radius:10px; padding:8px 12px; font-size:12px; }
+  .chip .n { color:#9bb89b; max-width:55%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chip .s { display:flex; gap:3px; }
+  .chip .v { font-weight:800; } .chip .v.ok { color:#4ade80; } .chip .v.nao { color:#ff7878; }
+
+  body.building { background:
+    radial-gradient(1000px 500px at 50% -10%, #3b2a1e, transparent), #1a1410; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🐱 <b>GATINHO</b></h1>
+  <span class="pill">💰 <b id="coins">?</b> 🪙</span>
+</header>
+
+<div class="tabs">
+  <button class="tab on" id="tabSlot">🎰 Máquina</button>
+  <button class="tab" id="tabVila">🏠 Vila</button>
+</div>
+
+<!-- painel máquina -->
+<div class="panel" id="panelSlot">
+  <div class="mascote">🐱</div>
+  <div class="slot" id="slot">
+    <div class="reel" id="r0">?</div>
+    <div class="reel" id="r1">?</div>
+    <div class="reel" id="r2">?</div>
+  </div>
+  <button class="spin-btn" id="btnSpin">🎰 Girar · <span id="custo">20</span> 🪙</button>
+  <div class="msg" id="msg"></div>
+  <div class="mini">O Gatinho gira a máquina! Acertar 2 ou 3 iguais ganha moedas 🐟</div>
+</div>
+
+<!-- painel vila -->
+<div class="panel hidden" id="panelVila">
+  <div class="vlvl">🏘️ Nível <b id="vlvl">1</b> · Progresso</div>
+  <div class="prog"><i id="vprog"></i></div>
+  <div id="blds"></div>
+</div>
+
+<div class="recent">
+  <h3>ÚLTIMOS GIROS</h3>
+  <div class="chips" id="recent"></div>
+</div>
+
+<script>
+  const API = (location.origin === 'file://' || location.origin.indexOf('localhost') !== -1) ? 'https://match3-te1c.onrender.com' : '';
+  let userId = localStorage.getItem('match3_user') || ('player_' + Math.random().toString(36).slice(2,10));
+  localStorage.setItem('match3_user', userId);
+
+  const $ = id => document.getElementById(id);
+  const fmt = n => Number(n).toLocaleString('pt-BR');
+  const SYMS = ['🐱','🐟','🧶','🥛','🐁','💤','❌'];
+  let spinCost = 20;
+  let buildings = [];
+  let village = null;
+
+  function msg(txt, cls){ const el=$('msg'); el.textContent=txt; el.className='msg '+(cls||''); }
+  function setCoins(n){ $('coins').textContent = fmt(n||0); }
+
+  function bloquear(v){ $('btnSpin').disabled = v; }
+
+  function girar(){
+    bloquear(true);
+    msg('🎰 Girando...');
+    const r0=$('r0'),r1=$('r1'),r2=$('r2');
+    const anim = setInterval(()=>{ r0.textContent=SYMS[Math.random()*SYMS.length|0]; r1.textContent=SYMS[Math.random()*SYMS.length|0]; r2.textContent=SYMS[Math.random()*SYMS.length|0]; },80);
+    fetch(API+'/api/gato/spin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId, nick:userId})})
+      .then(r=>r.json()).then(d=>{
+        if(d.error){ clearInterval(anim); bloquear(false); msg('❌ '+d.error,'foi'); return; }
+        setTimeout(()=>{
+          clearInterval(anim);
+          r0.textContent=d.syms[0]; r1.textContent=d.syms[1]; r2.textContent=d.syms[2];
+          setCoins(d.balance);
+          if(d.kind==='all') msg('🎉 TRIPLO '+d.e+'! Ganhou +'+fmt(d.win)+' moedas!','bom');
+          else if(d.kind==='pair') msg('😺 Dupla '+d.e+'! Ganhou +'+fmt(d.win)+' moedas','bom');
+          else msg('😿 Nada dessa vez! Tenta de novo','foi');
+          bloquear(false);
+          renderRecent(d.recent||[]);
+        }, 400);
+      }).catch(()=>{ clearInterval(anim); bloquear(false); msg('Sem internet, tenta de novo','foi'); });
+  }
+
+  function renderRecent(list){
+    $('recent').innerHTML = (list||[]).map(c=>{
+      const v = c.win>0 ? '<span class="v ok">+'+c.win+'</span>' : '<span class="v nao">0</span>';
+      return '<div class="chip"><span class="n">'+c.nick+'</span><span class="s">'+c.syms.join('')+'</span>'+v+'</div>';
+    }).join('');
+  }
+
+  function renderVila(){
+    if(!village) return;
+    const v = village.village;
+    $('vlvl').textContent = v.level;
+    const ppInLvl = v.pp % 100;
+    $('vprog').style.width = Math.min(100, ppInLvl/ (v.xpToNext||100)*100) + '%';
+    const b = village.next;
+    const built = v.built || {};
+    const isBuilt = built && built.idx != null && b && buildings[built.idx] && buildings[built.idx].id === b.id;
+    $('blds').innerHTML = '<div class="bld'+(isBuilt?' done':'')+'">'+
+      '<div class="e">'+(b?b.e:'🏠')+'</div>'+
+      '<div class="nome">'+(b?b.nome:'Vila completa!')+'</div>'+
+      '<div class="custo">💰 '+fmt(b?b.custo:0)+' moedas</div>'+
+      '<button id="btnBuild" '+(isBuilt?'disabled':'')+'>Construir</button>'+
+      '</div>';
+    if(!isBuilt) $('btnBuild').onclick = construir;
+  }
+
+  function construir(){
+    fetch(API+'/api/gato/build',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId})})
+      .then(r=>r.json()).then(d=>{
+        if(d.error){ msg('❌ '+d.error,'foi'); return; }
+        setCoins(d.balance);
+        village = d;
+        msg('🏠 Construiu '+d.building.nome+'!','bom');
+        renderVila();
+        carregarVila();
+      }).catch(()=>msg('Sem internet','foi'));
+  }
+
+  function carregarVila(){
+    fetch(API+'/api/gato/village?userId='+userId).then(r=>r.json()).then(d=>{
+      if(d.error) return;
+      village=d; setCoins(d.balance); renderVila();
+    }).catch(()=>{});
+  }
+
+  function status(){
+    fetch(API+'/api/gato/status').then(r=>r.json()).then(d=>{
+      spinCost=d.spinCost; $('custo').textContent=spinCost;
+      buildings=d.buildings||[];
+      renderRecent(d.recent||[]);
+    }).catch(()=>{});
+  }
+
+  $('btnSpin').onclick = girar;
+  $('tabSlot').onclick = ()=>{ $('tabSlot').className='tab on'; $('tabVila').className='tab'; $('panelSlot').classList.remove('hidden'); $('panelVila').classList.add('hidden'); document.body.classList.remove('building'); };
+  $('tabVila').onclick = ()=>{ $('tabVila').className='tab on'; $('tabSlot').className='tab'; $('panelVila').classList.remove('hidden'); $('panelSlot').classList.add('hidden'); document.body.classList.add('building'); carregarVila(); };
+
+  fetch(API+'/api/balance/'+userId).then(r=>r.json()).then(d=>setCoins(d.balance)).catch(()=>{});
+  status();
+  setInterval(status, 5000);
+</script>
+</body>
+</html>

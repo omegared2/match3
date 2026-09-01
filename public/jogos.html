@@ -42,6 +42,10 @@
     <div class="ico">🎰</div>
     <div class="info"><div class="t">Cash Royale</div><div class="d">Battle royale de caça-níqueis — o último que sobra ganha tudo</div></div>
   </a>
+  <a class="card" href="/gato">
+    <div class="ico">🐱</div>
+    <div class="info"><div class="t">Gatinho <span class="tag novo">NOVO</span></div><div class="d">Gire a máquina com o gatinho e construa sua vila</div></div>
+  </a>
   <a class="card" href="/batalha">
     <div class="ico">⚔️</div>
     <div class="info"><div class="t">Batalha do Cavaleiro</div><div class="d">RPG de mundo aberto com NPCs e chefes</div></div>
@@ -49,6 +53,10 @@
   <a class="card" href="/bingo">
     <div class="ico">🎯</div>
     <div class="info"><div class="t">Bingo Diário <span class="tag novo">NOVO</span></div><div class="d">Cartela de 50 moedas e pote que só cresce</div></div>
+  </a>
+  <a class="card" href="/pisstoll">
+    <div class="ico">🔫</div>
+    <div class="info"><div class="t">Pisstoll <span class="tag novo">NOVO</span></div><div class="d">Tiro ao alvo: 5 → 10 → 20 alvos por fase, 60s!</div></div>
   </a>
   <a class="card" href="/roda">
     <div class="ico">🎡</div>
@@ -74,7 +82,7 @@
 <script>
 function compartilhar(){
   const link = location.origin + '/divulgar';
-  const texto = '🎮 Entra pra jogar! Match-3, Cash Royale, Cavaleiro, BINGO com pote acumulando, Roda da Fortuna com JACKPOT e Duelo 1x1 de Cartas! ' + link;
+  const texto = '🎮 Entra pra jogar! Match-3, Cash Royale, Cavaleiro, BINGO com pote acumulando, Roda da Fortuna com JACKPOT, Duelo 1x1 de Cartas, Loteria, Modo Turbo e PISSTOLL — tiro ao alvo! ' + link;
   if (navigator.share) navigator.share({ text: texto }); else { navigator.clipboard.writeText(texto + ' ' + link); alert('Link copiado! Cole no WhatsApp/grupos 😉'); }
 }
 </script>

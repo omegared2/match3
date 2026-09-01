@@ -11,6 +11,7 @@ const roda = require('./roda');
 const cartas = require('./cartas');
 const loteria = require('./loteria');
 const turbo = require('./turbo');
+const gato = require('./gato');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -118,6 +119,8 @@ app.get('/roda', (req, res) => res.sendFile(path.join(__dirname, 'public', 'roda
 app.get('/cartas', (req, res) => res.sendFile(path.join(__dirname, 'public', 'cartas.html')));
 app.get('/loteria', (req, res) => res.sendFile(path.join(__dirname, 'public', 'loteria.html')));
 app.get('/turbo', (req, res) => res.sendFile(path.join(__dirname, 'public', 'turbo.html')));
+app.get('/gato', (req, res) => res.sendFile(path.join(__dirname, 'public', 'gato.html')));
+app.get('/pisstoll', (req, res) => res.sendFile(path.join(__dirname, 'public', 'pisstoll.html')));
 app.get('/divulgar', (req, res) => res.sendFile(path.join(__dirname, 'public', 'divulgar.html')));
 
 // -------------------------------------------------------
@@ -450,6 +453,45 @@ app.post('/api/turbo/cashout', async (req, res) => {
   }
 });
 
+app.get('/api/gato/status', (req, res) => res.json(gato.status()));
+
+app.get('/api/gato/village', async (req, res) => {
+  try {
+    const r = await gato.village(db, String(req.query.userId || ''));
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    console.error('Erro ao buscar vila do gato:', err.message);
+    res.status(500).json({ error: 'Erro ao buscar vila' });
+  }
+});
+
+app.post('/api/gato/spin', async (req, res) => {
+  try {
+    const { userId, nick } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
+    const r = await gato.spin(db, userId, nick);
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    console.error('Erro no gato:', err.message);
+    res.status(500).json({ error: 'Erro no gato' });
+  }
+});
+
+app.post('/api/gato/build', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
+    const r = await gato.build(db, userId);
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    console.error('Erro ao construir vila do gato:', err.message);
+    res.status(500).json({ error: 'Erro ao construir' });
+  }
+});
+
 app.get('/api/admin/jogos', (req, res) => {
   if (!adminKeyOk(req)) return res.status(401).json({ error: 'chave inválida' });
   res.json({
@@ -457,7 +499,8 @@ app.get('/api/admin/jogos', (req, res) => {
     roda: roda.status(),
     cartas: cartas.snapshot(),
     loteria: loteria.status(),
-    turbo: turbo.status()
+    turbo: turbo.status(),
+    gato: gato.status()
   });
 });
 
