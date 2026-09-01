@@ -32,13 +32,15 @@
 <div class="capa">
   <div class="logo">🎮💰</div>
   <h1>Jogos do <b>Tiago</b></h1>
-  <p>8 jogos, 1 carteira de moedas. Compre uma vez (Pix) e jogue tudo.<br/>Bônus diário, duelos ao vivo, sorteios e potes acumulando!</p>
+  <p>10 jogos, 1 carteira de moedas. Compre uma vez (Pix) e jogue tudo.<br/>Bônus diário, duelos ao vivo, sorteios e potes acumulando!</p>
 </div>
 <div class="lista">
+  <div class="item"><div class="i">🐱</div><div><div class="t">Gatinho</div><div class="d">Gire a máquina do gatinho e construa sua vila</div></div></div>
   <div class="item"><div class="i">🍭</div><div><div class="t">Match-3</div><div class="d">O clássico de combinar doces</div></div></div>
   <div class="item"><div class="i">🎰</div><div><div class="t">Cash Royale</div><div class="d">Caça-níqueis battle royale: o último que sobra leva tudo</div></div></div>
   <div class="item"><div class="i">⚔️</div><div><div class="t">Batalha do Cavaleiro</div><div class="d">RPG aberto com NPCs e chefes</div></div></div>
   <div class="item"><div class="i">🎯</div><div><div class="t">Bingo Diário</div><div class="d">Cartela barata e pote que só cresce</div></div></div>
+  <div class="item"><div class="i">🔫</div><div><div class="t">Pisstoll</div><div class="d">Tiro ao alvo: 5, 10 e 20 alvos por fase, 60s</div></div></div>
   <div class="item"><div class="i">🎡</div><div><div class="t">Roda da Fortuna</div><div class="d">Gire e caia no JACKPOT acumulado</div></div></div>
   <div class="item"><div class="i">🃏</div><div><div class="t">Batalha de Cartas</div><div class="d">Duelo 1x1 ao vivo com blefe</div></div></div>
   <div class="item"><div class="i">🍀</div><div><div class="t">Loteria</div><div class="d">Número 00-99 e prêmio de 80x</div></div></div>
@@ -53,7 +55,7 @@
 function abrir(){ location.href = '/jogos'; }
 function copiar(){
   const link = location.href;
-  navigator.clipboard.writeText('🎮 Entra pra jogar! Match-3, Cash Royale, Cavaleiro, Bingo com pote, Roda da Fortuna, Duelo 1x1, Loteria e Modo Turbo. Tudo com Pix! ' + link)
+  navigator.clipboard.writeText('🎮 Entra pra jogar! Match-3, Cash Royale, Cavaleiro, Bingo com pote, Roda da Fortuna, Duelo 1x1, Loteria, Modo Turbo e Pisstoll! Tudo com Pix! ' + link)
     .then(()=>{ const m=document.getElementById('msg'); m.textContent='Copiado! Bora espalhar nos grupos 😉'; setTimeout(()=>m.textContent='',3000); });
 }
 </script>

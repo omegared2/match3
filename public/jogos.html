@@ -9,82 +9,107 @@
   body { font-family:system-ui,sans-serif; background:
     radial-gradient(1000px 460px at 50% -10%, #34206e, transparent), #170f2e;
     color:#fff; min-height:100vh; }
-  header { padding:26px 18px 6px; text-align:center; }
-  header h1 { font-size:26px; }
+  header { padding:22px 18px 8px; text-align:center; }
+  header h1 { font-size:26px; } header h1 b { color:#ffd700; }
   header p { color:#a99bcc; font-size:13px; margin-top:4px; }
-  .grid { display:grid; gap:14px; padding:20px 18px; }
+
+  .saldo { display:flex; justify-content:center; align-items:center; gap:14px; margin:16px 0 4px; padding:0 18px; }
+  .card-saldo { background:linear-gradient(135deg,#2a1e58,#1e1444); border:1px solid #4a3f8e;
+    border-radius:16px; padding:14px 22px; text-align:center; flex:1; max-width:200px; }
+  .card-saldo .lbl { font-size:11px; color:#a99bcc; letter-spacing:1px; }
+  .card-saldo .val { font-size:26px; font-weight:900; color:#ffd700; }
+
+  .btn-comprar { background:linear-gradient(135deg,#ffd700,#ff9d00); color:#3a2a00; border:none;
+    border-radius:16px; padding:14px 20px; font-weight:900; font-size:15px; cursor:pointer; box-shadow:0 4px 18px rgba(255,215,0,.3); }
+
+  .destaque { padding:18px; }
+  .destaque a { text-decoration:none; color:#fff; display:block; background:linear-gradient(135deg,#f59e0b,#d97706);
+    border-radius:22px; padding:22px; position:relative; overflow:hidden; box-shadow:0 6px 24px rgba(217,119,6,.4); }
+  .destaque a .emoji { font-size:56px; }
+  .destaque a .t { font-size:24px; font-weight:900; margin-top:6px; }
+  .destaque a .d { font-size:14px; opacity:.9; margin-top:4px; }
+  .destaque .tag { position:absolute; top:14px; right:14px; background:#fff; color:#d97706;
+    font-size:11px; font-weight:900; padding:4px 10px; border-radius:999px; }
+
+  .secao { padding:6px 18px; }
+  .secao h2 { font-size:13px; color:#8b7fb0; letter-spacing:2px; margin:10px 0 8px; }
+  .grid { display:grid; gap:12px; padding:0 0 14px; }
   a.card { text-decoration:none; color:#fff; background:linear-gradient(135deg,#241845,#1d1238);
-    border:1px solid #3d2f6b; border-radius:18px; padding:18px 16px; display:flex; gap:14px;
+    border:1px solid #3d2f6b; border-radius:16px; padding:14px 16px; display:flex; gap:12px;
     align-items:center; transition:.15s; }
   a.card:active { transform:scale(.97); }
-  .ico { font-size:34px; width:52px; height:52px; border-radius:14px; display:flex;
+  .ico { font-size:30px; width:48px; height:48px; border-radius:12px; display:flex;
     align-items:center; justify-content:center; background:rgba(255,255,255,.08); flex-shrink:0; }
-  .info .t { font-weight:800; font-size:16px; }
-  .info .d { font-size:12px; color:#8b7fb0; margin-top:3px; }
-  .tag { font-size:10px; background:#2ecc71; color:#062; border-radius:999px; padding:2px 8px; font-weight:800; margin-left:6px; }
-  .tag.novo { background:#ffd700; color:#3a2a00; }
-  footer { padding:16px; text-align:center; }
+  .info .t { font-weight:800; font-size:15px; }
+  .info .d { font-size:11px; color:#8b7fb0; margin-top:2px; }
+  .tag { font-size:10px; background:#ffd700; color:#3a2a00; border-radius:999px; padding:1px 7px; font-weight:800; margin-left:6px; }
+
+  footer { padding:18px 16px 26px; text-align:center; }
   footer .btn { background:linear-gradient(135deg,#ffd700,#ff9d00); color:#3a2a00; border:none;
     border-radius:999px; padding:12px 22px; font-weight:800; font-size:15px; cursor:pointer; }
+  footer .mini { margin-top:10px; font-size:11px; color:#6b5f96; }
 </style>
 </head>
 <body>
 <header>
-  <h1>🎮 Lobby de Jogos</h1>
-  <p>Moedas valem em todos os jogos · compre uma vez e jogue onde quiser</p>
+  <h1>🎮 <b>Meus Jogos</b></h1>
+  <p>Uma carteira de moedas vale em todos os jogos</p>
 </header>
-<main class="grid">
-  <a class="card" href="/match3">
-    <div class="ico">🍭</div>
-    <div class="info"><div class="t">Match-3</div><div class="d">O clássico de combinar frutas</div></div>
+
+<div class="saldo">
+  <div class="card-saldo">
+    <div class="lbl">💎 MOEDAS</div>
+    <div class="val" id="saldo">...</div>
+  </div>
+  <button class="btn-comprar" onclick="location.href='/'">🪙 + Comprar</button>
+</div>
+
+<div class="destaque">
+  <a href="/gato" onclick="fechar()">
+    <span class="tag">NOVO 👑</span>
+    <div class="emoji">🐱</div>
+    <div class="t">Gatinho</div>
+    <div class="d">Gire a máquina e construa sua vila!</div>
   </a>
-  <a class="card" href="/royale">
-    <div class="ico">🎰</div>
-    <div class="info"><div class="t">Cash Royale</div><div class="d">Battle royale de caça-níqueis — o último que sobra ganha tudo</div></div>
-  </a>
-  <a class="card" href="/gato">
-    <div class="ico">🐱</div>
-    <div class="info"><div class="t">Gatinho <span class="tag novo">NOVO</span></div><div class="d">Gire a máquina com o gatinho e construa sua vila</div></div>
-  </a>
-  <a class="card" href="/batalha">
-    <div class="ico">⚔️</div>
-    <div class="info"><div class="t">Batalha do Cavaleiro</div><div class="d">RPG de mundo aberto com NPCs e chefes</div></div>
-  </a>
-  <a class="card" href="/bingo">
-    <div class="ico">🎯</div>
-    <div class="info"><div class="t">Bingo Diário <span class="tag novo">NOVO</span></div><div class="d">Cartela de 50 moedas e pote que só cresce</div></div>
-  </a>
-  <a class="card" href="/pisstoll">
-    <div class="ico">🔫</div>
-    <div class="info"><div class="t">Pisstoll <span class="tag novo">NOVO</span></div><div class="d">Tiro ao alvo: 5 → 10 → 20 alvos por fase, 60s!</div></div>
-  </a>
-  <a class="card" href="/roda">
-    <div class="ico">🎡</div>
-    <div class="info"><div class="t">Roda da Fortuna <span class="tag novo">NOVO</span></div><div class="d">Gire e tente o JACKPOT — ele só cresce</div></div>
-  </a>
-  <a class="card" href="/cartas">
-    <div class="ico">🃏</div>
-    <div class="info"><div class="t">Batalha de Cartas <span class="tag novo">NOVO</span></div><div class="d">Duelo 1x1 ao vivo, melhor de 3</div></div>
-  </a>
-  <a class="card" href="/loteria">
-    <div class="ico">🍀</div>
-    <div class="info"><div class="t">Loteria <span class="tag novo">NOVO</span></div><div class="d">Escolha um número 00-99 e leve 80x</div></div>
-  </a>
-  <a class="card" href="/turbo">
-    <div class="ico">🚀</div>
-    <div class="info"><div class="t">Modo Turbo <span class="tag novo">18+</span></div><div class="d">Multiplicador sobe até estourar — resgate na hora certa</div></div>
-  </a>
-</main>
+</div>
+
+<div class="secao">
+  <h2>🎰 CASSINO & SORTE</h2>
+  <div class="grid">
+    <a class="card" href="/royale"><div class="ico">🎰</div><div class="info"><div class="t">Cash Royale</div><div class="d">Battle royale — o último que sobra leva tudo</div></div></a>
+    <a class="card" href="/bingo"><div class="ico">🎯</div><div class="info"><div class="t">Bingo Diário <span class="tag">POTE</span></div><div class="d">Cartela barata e pote que só cresce</div></div></a>
+    <a class="card" href="/roda"><div class="ico">🎡</div><div class="info"><div class="t">Roda da Fortuna</div><div class="d">Gire e caia no JACKPOT</div></div></a>
+    <a class="card" href="/cartas"><div class="ico">🃏</div><div class="info"><div class="t">Batalha de Cartas</div><div class="d">Duelo 1x1 ao vivo</div></div></a>
+    <a class="card" href="/loteria"><div class="ico">🍀</div><div class="info"><div class="t">Loteria</div><div class="d">Número 00-99, prêmio 80x</div></div></a>
+    <a class="card" href="/turbo"><div class="ico">🚀</div><div class="info"><div class="t">Modo Turbo</div><div class="d">Multiplicador até estourar <span class="tag">18+</span></div></div></a>
+  </div>
+</div>
+
+<div class="secao">
+  <h2>🎮 JOGABILIDADE</h2>
+  <div class="grid">
+    <a class="card" href="/match3"><div class="ico">🍭</div><div class="info"><div class="t">Match-3</div><div class="d">O clássico de combinar doces</div></div></a>
+    <a class="card" href="/batalha"><div class="ico">⚔️</div><div class="info"><div class="t">Batalha do Cavaleiro</div><div class="d">RPG com NPCs e chefes</div></div></a>
+    <a class="card" href="/pisstoll"><div class="ico">🔫</div><div class="info"><div class="t">Pisstoll</div><div class="d">Tiro ao alvo em fases</div></div></a>
+  </div>
+</div>
+
 <footer>
-  <button class="btn" onclick="compartilhar()">🔗 Convidar amigos (e ganhar movimentação)</button>
-  <p style="margin-top:10px; font-size:11px; color:#6b5f96;">Divulgar ajuda o pote do Bingo a crescer mais rápido 🚀</p>
+  <button class="btn" onclick="compartilhar()">🔗 Convidar amigos</button>
+  <div class="mini">Divulgar faz o pote do Bingo crescer mais rápido 🚀</div>
 </footer>
 <script>
-function compartilhar(){
-  const link = location.origin + '/divulgar';
-  const texto = '🎮 Entra pra jogar! Match-3, Cash Royale, Cavaleiro, BINGO com pote acumulando, Roda da Fortuna com JACKPOT, Duelo 1x1 de Cartas, Loteria, Modo Turbo e PISSTOLL — tiro ao alvo! ' + link;
-  if (navigator.share) navigator.share({ text: texto }); else { navigator.clipboard.writeText(texto + ' ' + link); alert('Link copiado! Cole no WhatsApp/grupos 😉'); }
-}
+  const API = (location.origin === 'file://' || location.origin.indexOf('localhost') !== -1) ? 'https://match3-te1c.onrender.com' : '';
+  let userId = localStorage.getItem('match3_user') || ('player_' + Math.random().toString(36).slice(2,10));
+  localStorage.setItem('match3_user', userId);
+  fetch(API+'/api/balance/'+userId).then(r=>r.json()).then(d=>{
+    document.getElementById('saldo').textContent = Number(d.balance||0).toLocaleString('pt-BR');
+  }).catch(()=>{});
+  function compartilhar(){
+    const link = location.origin + '/divulgar';
+    const texto = '🎮 Entra pra jogar! Tem 10 jogos: Gatinho, Match-3, Cash Royale, Bingo com pote acumulando, Roda da Fortuna, Duelo de Cartas, Loteria e mais! Tudo com Pix! ' + link;
+    if (navigator.share) navigator.share({ text: texto }); else { navigator.clipboard.writeText(texto + ' ' + link); alert('Link copiado! Cole no WhatsApp/grupos 😉'); }
+  }
 </script>
 </body>
 </html>
