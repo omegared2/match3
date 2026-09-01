@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const pix = require('./pix');
 const db = require('./db');
 const arena = require('./arena');
@@ -12,6 +13,7 @@ const cartas = require('./cartas');
 const loteria = require('./loteria');
 const turbo = require('./turbo');
 const gato = require('./gato');
+const criador = require('./criador');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -35,6 +37,17 @@ async function notifyTelegram(text) {
 function packLabel(packId) {
   const pp = PACKS.find(p => p.id === packId);
   return pp ? `R$ ${pp.brl.toFixed(2).replace('.', ',')} (${pp.coins} moedas)` : packId || '';
+}
+
+// Se for compra do Criador de Vídeos, libera o usuário em vez de dar moedas
+function aplicarCredito(stored) {
+  if (stored && String(stored.packId).startsWith('CRIADOR_')) {
+    const u = criador.getUso(stored.userId);
+    u.liberado = true;
+    const plano = String(stored.packId).replace('CRIADOR_', '');
+    return { liberado: true, plano };
+  }
+  return null;
 }
 
 // -------------------------------------------------------
@@ -120,6 +133,7 @@ app.get('/cartas', (req, res) => res.sendFile(path.join(__dirname, 'public', 'ca
 app.get('/loteria', (req, res) => res.sendFile(path.join(__dirname, 'public', 'loteria.html')));
 app.get('/turbo', (req, res) => res.sendFile(path.join(__dirname, 'public', 'turbo.html')));
 app.get('/gato', (req, res) => res.sendFile(path.join(__dirname, 'public', 'gato.html')));
+app.get('/criador', (req, res) => res.sendFile(path.join(__dirname, 'public', 'criador.html')));
 app.get('/pisstoll', (req, res) => res.sendFile(path.join(__dirname, 'public', 'pisstoll.html')));
 app.get('/divulgar', (req, res) => res.sendFile(path.join(__dirname, 'public', 'divulgar.html')));
 
@@ -183,11 +197,17 @@ app.get('/api/payment-status/:paymentId', async (req, res) => {
     if (status === 'approved') {
       const stored = await db.dbApprovePayment(paymentId);
       if (stored) {
-        // Aprovado: entrega as moedas
-        await db.dbAddCoins(stored.userId, stored.coins);
-        credited = true;
-        coins = stored.coins;
-        notifyTelegram(`💰 Pix PAGO! Compra ${packLabel(stored.packId)} · +${stored.coins} moedas\n👤 Jogador: ${stored.userId}\n🧾 Pagamento: ${paymentId}`);
+        const lib = aplicarCredito(stored);
+        if (lib) {
+          credited = true;
+          coins = lib.liberado ? 1 : 0;
+          notifyTelegram(`🎬 CRIADOR DE VÍDEOS LIBERADO!\n💲 Plano: ${lib.plano}\n👤 Usuário: ${stored.userId}\n🧾 Pagamento: ${paymentId}`);
+        } else {
+          await db.dbAddCoins(stored.userId, stored.coins);
+          credited = true;
+          coins = stored.coins;
+          notifyTelegram(`💰 Pix PAGO! Compra ${packLabel(stored.packId)} · +${stored.coins} moedas\n👤 Jogador: ${stored.userId}\n🧾 Pagamento: ${paymentId}`);
+        }
       } else {
         const p = await db.dbGetPayment(paymentId);
         coins = p ? p.coins : 0;
@@ -221,9 +241,15 @@ app.post('/api/webhook/mp', (req, res) => {
         if (status === 'approved') {
           const stored = await db.dbApprovePayment(String(paymentId));
           if (stored) {
-            await db.dbAddCoins(stored.userId, stored.coins);
-            console.log(`Pagamento ${paymentId} aprovado +${stored.coins} moedas para ${stored.userId}`);
-            notifyTelegram(`💰 Pix PAGO! Compra ${packLabel(stored.packId)} · +${stored.coins} moedas\n👤 Jogador: ${stored.userId}\n🧾 Pagamento: ${paymentId}`);
+            const lib = aplicarCredito(stored);
+            if (lib) {
+              console.log(`Criador liberado ${stored.userId} (${lib.plano})`);
+              notifyTelegram(`🎬 CRIADOR DE VÍDEOS LIBERADO!\n💲 Plano: ${lib.plano}\n👤 Usuário: ${stored.userId}\n🧾 Pagamento: ${paymentId}`);
+            } else {
+              await db.dbAddCoins(stored.userId, stored.coins);
+              console.log(`Pagamento ${paymentId} aprovado +${stored.coins} moedas para ${stored.userId}`);
+              notifyTelegram(`💰 Pix PAGO! Compra ${packLabel(stored.packId)} · +${stored.coins} moedas\n👤 Jogador: ${stored.userId}\n🧾 Pagamento: ${paymentId}`);
+            }
           }
         }
       }).catch(e => console.error('Erro no webhook:', e.message));
@@ -489,6 +515,70 @@ app.post('/api/gato/build', async (req, res) => {
   } catch (err) {
     console.error('Erro ao construir vila do gato:', err.message);
     res.status(500).json({ error: 'Erro ao construir' });
+  }
+});
+
+// -------------------------------------------------------
+// CRIADOR DE VÍDEOS — sugestão, geração, limite e liberação
+// -------------------------------------------------------
+app.get('/api/criador/sugerir', (req, res) => {
+  const tipo = String(req.query.tipo || 'geral');
+  res.json(criador.sugerir(tipo));
+});
+
+app.get('/api/criador/status', (req, res) => {
+  res.json(criador.status(String(req.query.userId || '')));
+});
+
+app.post('/api/criador/gerar', async (req, res) => {
+  try {
+    const { userId, nome, f1, f2, emoji, paleta } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
+    if (!criador.podeGerar(userId)) {
+      return res.status(403).json({ error: 'Limite grátis atingido! Compre o acesso pra continuar.' });
+    }
+    const u = criador.getUso(userId);
+    const result = await criador.gerarVideo(userId, { nome, f1, f2, emoji, paleta });
+    u.count += 1;
+    res.json({ ok: true, ...result, status: criador.status(userId) });
+  } catch (err) {
+    console.error('Erro ao gerar vídeo do criador:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/criador/liberar', async (req, res) => {
+  try {
+    const { userId, planId } = req.body;
+    if (!userId || !planId) return res.status(400).json({ error: 'userId e planId obrigatórios' });
+    const plan = criador.CFG.precos.find(p => p.id === planId);
+    if (!plan) return res.status(400).json({ error: 'Plano inválido' });
+
+    const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+    const result = await pix.createPayment({ name: plan.nome, brl: plan.brl, coins: 1, code: plan.code }, baseUrl);
+    const paymentId = String(result.id);
+
+    await db.dbSavePayment(paymentId, { userId, packId: 'CRIADOR_' + plan.id, coins: 1 });
+
+    res.json({
+      paymentId,
+      qrCode: result.point_of_interaction.transaction_data.qr_code,
+      qrCodeBase64: result.point_of_interaction.transaction_data.qr_code_base64,
+      status: criador.status(userId)
+    });
+  } catch (err) {
+    console.error('Erro ao criar Pix do criador:', err.response?.data || err.message);
+    res.status(500).json({ error: 'Falha ao gerar Pix' });
+  }
+});
+
+app.get('/api/criador/video/:arquivo', (req, res) => {
+  const nome = path.basename(String(req.params.arquivo));
+  const caminho = path.join(criador.videoDir, nome);
+  if (fs.existsSync(caminho)) {
+    res.sendFile(caminho);
+  } else {
+    res.status(404).json({ error: 'Vídeo não encontrado' });
   }
 });
 

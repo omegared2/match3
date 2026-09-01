@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CriadorPro — Vídeos de Divulgação</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',system-ui,sans-serif; }
+  body { background:#0d0a1c; color:#fff; min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:20px; }
+  .topo { text-align:center; margin-bottom:16px; }
+  .topo h1 { font-size:26px; color:#ffd700; }
+  .topo p { color:#b9b3d4; margin-top:4px; font-size:14px; }
+  .card { background:#181333; border:1px solid #2a2150; border-radius:16px; padding:20px; width:100%; max-width:420px; box-shadow:0 8px 30px rgba(0,0,0,.4); }
+  label { display:block; font-size:13px; color:#b9b3d4; margin:14px 0 6px; }
+  input, select { width:100%; padding:12px; border-radius:10px; border:1px solid #2a2150; background:#120e2a; color:#fff; font-size:15px; }
+  input:focus, select:focus { outline:none; border-color:#ffd700; }
+  .cores { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
+  .cor { width:40px; height:40px; border-radius:50%; border:3px solid transparent; cursor:pointer; }
+  .cor.ativo { border-color:#ffd700; transform:scale(1.12); }
+  .row { display:flex; gap:8px; margin-top:14px; }
+  .btn { flex:1; padding:14px; border:none; border-radius:12px; font-size:16px; font-weight:bold; cursor:pointer; }
+  .btn.primario { background:linear-gradient(135deg,#ffd700,#f7b500); color:#120e2a; }
+  .btn.sugerir { background:#2a2150; color:#fff; margin-top:10px; width:100%; }
+  .btn:hover { opacity:.9; }
+  .meta { margin-top:20px; padding:14px; background:#120e2a; border-radius:12px; font-size:13px; color:#b9b3d4; display:none; }
+  .meta b { color:#ffd700; }
+  .barra { height:10px; background:#2a2150; border-radius:10px; margin-top:8px; overflow:hidden; }
+  .barra div { height:100%; background:linear-gradient(90deg,#ffd700,#f7b500); transition:width .4s; }
+  .video-box { margin-top:16px; display:none; }
+  .video-box video { width:100%; border-radius:12px; max-height:300px; background:#000; }
+  .compra { margin-top:18px; display:none; }
+  .compra .preco { display:flex; gap:10px; }
+  .compra .preco div { flex:1; background:#120e2a; border-radius:12px; padding:14px; text-align:center; cursor:pointer; border:2px solid transparent; }
+  .compra .preco div.esc { border-color:#ffd700; }
+  .compra .preco h3 { color:#ffd700; font-size:15px; }
+  .compra .preco p { color:#fff; font-size:13px; }
+  .qr { text-align:center; margin-top:14px; display:none; }
+  .qr img { width:200px; height:200px; border-radius:10px; }
+  .qr p { margin-top:8px; font-size:14px; color:#b9b3d4; }
+  .aviso { background:rgba(255,215,0,.12); border:1px solid rgba(255,215,0,.3); border-radius:12px; padding:14px; font-size:13px; color:#ffe89a; margin-top:16px; }
+  .aviso.pago { background:rgba(46,204,113,.15); border-color:rgba(46,204,113,.4); color:#8ff0b0; }
+  .carregando { display:none; margin-top:14px; text-align:center; color:#ffd700; font-size:14px; }
+  .spin { display:inline-block; width:18px; height:18px; border:3px solid rgba(255,215,0,.3); border-top-color:#ffd700; border-radius:50%; animation:g 1s linear infinite; vertical-align:middle; }
+  @keyframes g { to{transform:rotate(360deg)} }
+  .erro { color:#ff6b6b; margin-top:10px; font-size:13px; display:none; }
+  .plano-badge { margin-top:10px; font-size:13px; }
+</style>
+</head>
+<body>
+  <div class="topo">
+    <h1>🎬 CriadorPro</h1>
+    <p>Crie um vídeo de divulgação pro seu negócio em segundos</p>
+  </div>
+
+  <div class="card">
+    <label>Tipo de negócio (pra IA ajudar)</label>
+    <select id="tipo">
+      <option value="geral">Geral / Outro</option>
+      <option value="doceria">Doceria</option>
+      <option value="salao">Salão de Beleza</option>
+      <option value="roupas">Loja de Roupas</option>
+      <option value="jogo">Jogo / App</option>
+      <option value="comida">Comida / Restaurante</option>
+      <option value="academia">Academia</option>
+    </select>
+    <button class="btn sugerir" onclick="sugerir()">✨ Sugerir texto pra mim (IA)</button>
+
+    <label>Nome do seu negócio</label>
+    <input id="nome" placeholder="Ex: Loja da Ana">
+
+    <label>Frase principal (que chama atenção)</label>
+    <input id="f1" placeholder="Ex: Doces caseiros deliciosos">
+
+    <label>Frase de apoio</label>
+    <input id="f2" placeholder="Ex: Encomende agora mesmo!">
+
+    <label>Cor do vídeo</label>
+    <div class="cores" id="cores"></div>
+
+    <div class="carregando" id="carregando"><span class="spin"></span> Criando seu vídeo... aguarde ~15s</div>
+    <div class="erro" id="erro"></div>
+
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn primario" onclick="gerar()">🎬 Criar Vídeo</button>
+    </div>
+
+    <div class="video-box" id="videoBox">
+      <video id="meuVideo" controls></video>
+    </div>
+
+    <div class="meta" id="meta"></div>
+  </div>
+
+  <div class="aviso" id="avisoTeste">
+    🎁 <b>Teste grátis:</b> você pode criar <b id="restam">3</b> vídeos de graça (com a marca CriadorPro). Depois, é só comprar o acesso pra criar sem limite e sem marca d'água!
+  </div>
+
+  <div class="card compra" id="compraCard">
+    <label><b style="color:#ffd700">🔓 Desbloquear CriadorPro</b></label>
+    <div class="preco">
+      <div onclick="selPlano('vitalicio')" id="pl-vitalicio">
+        <h3>Vitalício</h3><p>R$ 30</p>
+      </div>
+      <div onclick="selPlano('mensal')" id="pl-mensal">
+        <h3>Mensal</h3><p>R$ 10</p>
+      </div>
+    </div>
+    <button class="btn primario" style="margin-top:12px" onclick="comprar()">💳 Pagar com Pix</button>
+    <div class="qr" id="qr"><img id="qrImg"><p id="qrMsg">Pague o Pix pra liberar! Assim que pagar, o acesso é liberado na hora.</p></div>
+    <div class="plano-badge"></div>
+  </div>
+
+<script>
+  const API = (location.origin === 'file://' || location.origin.indexOf('localhost') !== -1) ? 'https://match3-te1c.onrender.com' : '';
+  const userId = localStorage.getItem('criador_user') || ('cri_' + Math.random().toString(36).slice(2,12));
+  localStorage.setItem('criador_user', userId);
+
+  const CORES = {
+    roxo:'#34206e', azul:'#193c82', verde:'#1e6e3c', rosa:'#78235a', ouro:'#8c5a0a', casa:'#643c19'
+  };
+  let plano = 'vitalicio';
+  let estado = null;
+
+  function montarCores() {
+    const cont = document.getElementById('cores');
+    cont.innerHTML='';
+    const chaves = estado ? estado.paletasLivres : ['roxo','azul'];
+    // mostra as cores que o usuário pode: livre (todas se liberado, senão as livres)
+    const todas = Object.keys(CORES);
+    const permitidas = estado && estado.liberado ? todas : chaves;
+    if (estado && !estado.liberado) {
+      permitidas.forEach((c,i)=>{
+        const el=document.createElement('div');
+        el.className='cor'+(i===0?' ativo':'');
+        el.style.background=CORES[c];
+        el.dataset.cor=c;
+        el.onclick=()=>{document.querySelectorAll('.cor').forEach(x=>x.classList.remove('ativo'));el.classList.add('ativo');};
+        cont.appendChild(el);
+      });
+    } else {
+      todas.forEach((c,i)=>{
+        const el=document.createElement('div');
+        el.className='cor'+(i===0?' ativo':'');
+        el.style.background=CORES[c];
+        el.dataset.cor=c;
+        el.onclick=()=>{document.querySelectorAll('.cor').forEach(x=>x.classList.remove('ativo'));el.classList.add('ativo');};
+        cont.appendChild(el);
+      });
+    }
+  }
+  function corAtiva(){ return document.querySelector('.cor.ativo')?.dataset.cor || 'roxo'; }
+
+  async function atualizarStatus(){
+    try {
+      const r = await fetch(API+'/api/criador/status?userId='+userId);
+      estado = await r.json();
+      document.getElementById('restam').textContent = estado.restam === -1 ? '∞' : estado.restam;
+      montarCores();
+      const meta = document.getElementById('meta');
+      if (estado.liberado) {
+        meta.style.display='block';
+        meta.innerHTML = '✅ <b>PRO seria liberado!</b> Vídeos ilimitados, todas as cores, sem marca d\'água.';
+        document.getElementById('avisoTeste').className='aviso pago';
+      } else {
+        meta.style.display='none';
+      }
+      if (!estado.liberado && estado.usado >= estado.freeLimit) {
+        document.getElementById('compraCard').style.display='block';
+      }
+    } catch(e){ console.log(e); }
+  }
+
+  async function sugerir(){
+    const tipo = document.getElementById('tipo').value;
+    try {
+      const r = await fetch(API+'/api/criador/sugerir?tipo='+tipo);
+      const d = await r.json();
+      if(d.frases){
+        document.getElementById('f1').value = d.frases[0] || '';
+        document.getElementById('f2').value = d.frases[1] || '';
+      }
+    } catch(e){}
+  }
+
+  async function gerar(){
+    const nome = document.getElementById('nome').value.trim();
+    const f1 = document.getElementById('f1').value.trim();
+    const f2 = document.getElementById('f2').value.trim();
+    const paleta = corAtiva();
+    if(!nome){ mostrarErro('Digite o nome do negócio!'); return; }
+    document.getElementById('erro').style.display='none';
+    document.getElementById('carregando').style.display='block';
+    try {
+      const r = await fetch(API+'/api/criador/gerar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId, nome, f1, f2, emoji:'🪙', paleta})});
+      const d = await r.json();
+      document.getElementById('carregando').style.display='none';
+      if(d.error){ mostrarErro(d.error); return; }
+      const vb = document.getElementById('videoBox');
+      vb.style.display='block';
+      document.getElementById('meuVideo').src = API + d.videoUrl + '?t='+Date.now();
+      document.getElementById('meuVideo').load();
+      document.getElementById('meuVideo').play().catch(()=>{});
+      if(d.status){
+        estado = d.status;
+        document.getElementById('restam').textContent = estado.restam === -1 ? '∞' : estado.restam;
+        if(!estado.liberado && estado.usado >= estado.freeLimit){
+          document.getElementById('compraCard').style.display='block';
+        }
+      }
+    } catch(e){
+      document.getElementById('carregando').style.display='none';
+      mostrarErro('Falha na conexão. Tente de novo.');
+    }
+  }
+
+  function mostrarErro(m){ const e=document.getElementById('erro'); e.textContent=m; e.style.display='block'; }
+
+  function selPlano(p){
+    plano=p;
+    document.querySelectorAll('.preco div').forEach(x=>x.classList.remove('esc'));
+    document.getElementById('pl-'+p).classList.add('esc');
+    document.getElementById('qr').style.display='none';
+  }
+
+  async function comprar(){
+    const btn=document.querySelector('.compra .btn.primario');
+    btn.disabled=true; btn.textContent='Gerando Pix...';
+    try {
+      const r=await fetch(API+'/api/criador/liberar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId, planId:plano})});
+      const d=await r.json();
+      btn.disabled=false; btn.textContent='💳 Pagar com Pix';
+      if(d.error){ mostrarErro(d.error); return; }
+      const qr=document.getElementById('qr');
+      qr.style.display='block';
+      document.getElementById('qrImg').src='data:image/png;base64,'+d.qrCodeBase64;
+      // faz polling pra saber quando pagou
+      pollPayment(d.paymentId);
+    } catch(e){
+      btn.disabled=false; btn.textContent='💳 Pagar com Pix';
+      mostrarErro('Erro ao gerar Pix. Tente de novo.');
+    }
+  }
+
+  async function pollPayment(paymentId){
+    for(let i=0;i<40;i++){
+      await new Promise(r=>setTimeout(r,3000));
+      try{
+        const r=await fetch(API+'/api/payment-status/'+paymentId);
+        const d=await r.json();
+        if(d.status==='approved'){
+          document.getElementById('qrMsg').textContent='✅ PAGO! Acesso liberado!';
+          await atualizarStatus();
+          location.reload();
+          return;
+        }
+      }catch(e){}
+    }
+  }
+
+  atualizarStatus();
+</script>
+</body>
+</html>
