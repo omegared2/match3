@@ -83,7 +83,7 @@ function adNotifyMilestone() {
     );
   }
 }
-app.post('/api/ad-event', (req, res) => {
+app.post('/api/ad-event', express.json(), (req, res) => {
   const { type, valueMicros, currencyCode, networkName } = req.body || {};
   const t = ['banner', 'interstitial', 'recompensado'].includes(type) ? type : 'outros';
   const value = Number(valueMicros) || 0;
