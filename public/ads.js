@@ -75,14 +75,18 @@
     opts = opts || {};
     postAdEvent('recompensado');
     // modo real: unidade nativa ainda não configurada — rende via overlay/timer
-    function done() { if (opts.onComplete) opts.onComplete(); }
+    var amount = (opts.coins || opts.amount) || 5;
+    function finish() { if (opts.onComplete) opts.onComplete(); }
     if (!ACTIVE) {
-      var i = setTimeout(done, 2000);
+      var i = setTimeout(function () {
+        if (opts.onStart) { /* não re-cancela após iniciado */ }
+        grantCoins(amount, finish);
+      }, 2000);
       if (opts.onStart) opts.onStart(function cancel() { clearTimeout(i); });
       return;
     }
     loadRealScript(function () {
-      grantCoins((opts.coins || opts.amount) || 5, done);
+      grantCoins(amount, finish);
     });
   }
 

@@ -22,6 +22,10 @@
   .btn-comprar { background:linear-gradient(135deg,#ffd700,#ff9d00); color:#3a2a00; border:none;
     border-radius:16px; padding:14px 20px; font-weight:900; font-size:15px; cursor:pointer; box-shadow:0 4px 18px rgba(255,215,0,.3); }
 
+  .btn-ad { background:linear-gradient(135deg,#ffd700,#ff9d00); color:#3a2a00; border:none;
+    border-radius:999px; padding:12px 22px; font-weight:800; font-size:15px; cursor:pointer;
+    box-shadow:0 4px 18px rgba(255,215,0,.3); }
+
   .destaque { padding:18px; }
   .destaque a { text-decoration:none; color:#fff; display:block; background:linear-gradient(135deg,#f59e0b,#d97706);
     border-radius:22px; padding:22px; position:relative; overflow:hidden; box-shadow:0 6px 24px rgba(217,119,6,.4); }
@@ -49,6 +53,10 @@
     border-radius:999px; padding:12px 22px; font-weight:800; font-size:15px; cursor:pointer; }
   footer .mini { margin-top:10px; font-size:11px; color:#6b5f96; }
 </style>
+<script>
+  window.ADS_CONFIG = { slots: { banner: null, rewarded: null, interstitial: null } };
+</script>
+<script src="/ads.js"></script>
 </head>
 <body>
 <header>
@@ -62,6 +70,7 @@
     <div class="val" id="saldo">...</div>
   </div>
   <button class="btn-comprar" onclick="location.href='/'">🪙 + Comprar</button>
+  <button class="btn-ad" id="btn-ad-rewarded" onclick="verAnuncio()">📺 Ver anúncio · +5 moedas</button>
 </div>
 
 <div class="destaque">
@@ -95,6 +104,7 @@
   </div>
 </div>
 
+<div id="ad-banner" style="min-height:50px;margin:14px auto;max-width:720px;text-align:center"></div>
 <footer>
   <button class="btn" onclick="compartilhar()">🔗 Convidar amigos</button>
   <div class="mini">Divulgar faz o pote do Bingo crescer mais rápido 🚀</div>
@@ -103,9 +113,17 @@
   const API = (location.origin === 'file://' || location.origin.indexOf('localhost') !== -1) ? 'https://match3-te1c.onrender.com' : '';
   let userId = localStorage.getItem('match3_user') || ('player_' + Math.random().toString(36).slice(2,10));
   localStorage.setItem('match3_user', userId);
-  fetch(API+'/api/balance/'+userId).then(r=>r.json()).then(d=>{
-    document.getElementById('saldo').textContent = Number(d.balance||0).toLocaleString('pt-BR');
-  }).catch(()=>{});
+  function atualizaSaldo(){
+    fetch(API+'/api/balance/'+userId).then(r=>r.json()).then(d=>{
+      document.getElementById('saldo').textContent = Number(d.balance||0).toLocaleString('pt-BR');
+    }).catch(()=>{});
+  }
+  atualizaSaldo();
+  function verAnuncio(){
+    if(!window.Ads){ alert('Anúncios indisponíveis no momento.'); return; }
+    Ads.showRewarded({ coins: 5, onComplete: function(){ atualizaSaldo(); alert('+5 moedas!'); } });
+  }
+  if (window.Ads) Ads.showBanner('ad-banner');
   function compartilhar(){
     const link = location.origin + '/divulgar';
     const texto = '🎮 Entra pra jogar! Tem 10 jogos: Gatinho, Match-3, Cash Royale, Bingo com pote acumulando, Roda da Fortuna, Duelo de Cartas, Loteria e mais! Tudo com Pix! ' + link;
