@@ -88,14 +88,20 @@
   #pixstatus { font-size:13px; color:#fdbb2d; margin-top:8px; min-height:18px; }
   .close-x { position:absolute; top:8px; right:12px; font-size:22px; cursor:pointer; color:#ccc; }
 </style>
+<script>
+  window.ADS_CONFIG = { slots: { banner: null, rewarded: null, interstitial: null } };
+</script>
+<script src="/ads.js"></script>
 </head>
 <body>
+  <div id="ad-banner" style="min-height:50px;margin:6px auto;max-width:720px;text-align:center"></div>
   <button class="sound-toggle" id="soundBtn" onclick="toggleSound()">🔊</button>
   <h1>🍎 MATCH-3 FRUTAS 🍇</h1>
 <div id="hud">
   <span class="pill">💰 Moedas: <b id="coins">100</b></span>
   <span class="pill">🏆 <b id="score">0</b></span>
   <button class="btn" onclick="newGame()">Novo Jogo</button>
+  <button id="btn-ad-rewarded" class="btn green" onclick="showRewardedAd()">📺 Ver anúncio · +10 moedas</button>
 </div>
 
 <div class="board-wrap">
@@ -284,6 +290,14 @@ function buyBoost(id){
 }
 
 function updateHUD(){ coinsEl.textContent=coins; scoreEl.textContent=score; }
+
+function showRewardedAd(){
+  if(!window.Ads){ if(msgEl) msgEl.textContent='Anúncios indisponíveis no momento.'; return; }
+  Ads.showRewarded({
+    coins: 10,
+    onComplete: function(){ coins += 10; updateHUD(); if(msgEl) msgEl.textContent='+10 moedas!'; }
+  });
+}
 
 function init(){
   gridEl.style.gridTemplateColumns=`repeat(${COLS},42px)`;
@@ -518,6 +532,7 @@ function toggleSound(){
 // ---------- VITÓRIA / DERROTA ----------
 function showWin(){
   if(won||lost)return; won=true;
+  if (window.Ads) Ads.showInterstitial(function(){});
   coins+=1000; updateHUD();
   document.getElementById('winScore').textContent=score;
   document.getElementById('winCoins').textContent=coins;
@@ -542,6 +557,7 @@ function closeWin(){
 }
 function showLose(){
   if(lost||won)return; lost=true;
+  if (window.Ads) Ads.showInterstitial(function(){});
   document.getElementById('loseScore').textContent=score;
   document.getElementById('loseCoins').textContent=coins;
   document.getElementById('lose').style.display='flex';
@@ -552,6 +568,7 @@ function closeLose(){
 }
 
 renderPacks(); renderShop(); newGame();
+if (window.Ads) Ads.showBanner('ad-banner');
 </script>
 </body>
 </html>
