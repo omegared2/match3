@@ -518,6 +518,32 @@ app.post('/api/gato/build', async (req, res) => {
   }
 });
 
+app.post('/api/gato/advance', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
+    const r = await gato.advance(db, userId);
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    console.error('Erro ao avançar vila do gato:', err.message);
+    res.status(500).json({ error: 'Erro ao avançar' });
+  }
+});
+
+app.post('/api/gato/daily', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
+    const r = await gato.daily(db, userId);
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    console.error('Erro na diária do gato:', err.message);
+    res.status(500).json({ error: 'Erro na diária' });
+  }
+});
+
 // -------------------------------------------------------
 // CRIADOR DE VÍDEOS — sugestão, geração, limite e liberação
 // -------------------------------------------------------
