@@ -99,6 +99,38 @@ function seeded(seed) {
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 function yesterdayStr() { return new Date(Date.now() - 86400000).toISOString().slice(0, 10); }
 
+// ---- EVENTOS (modulares; ativados/desativados pelo servidor por data) ----
+// Ligar/desligar tudo de uma vez: env GATO_EVENTOS=off. Sem app separado.
+const EVENTS = [
+  { id: 'gatos', nome: 'Evento dos Gatos',    e: '🐈', de: '2026-01-01', ate: '2030-12-31', efeito: { catMult: 1.5 },  txt: '+50% chance de achar gatos 🐾' },
+  { id: 'sorte', nome: 'Evento da Sorte',     e: '🍀', de: '2026-09-01', ate: '2026-10-01', efeito: { coinsMult: 1.2 }, txt: '+20% moedas nos giros 🪙' },
+  { id: 'saque', nome: 'Evento do Saque',     e: '🎁', de: '2026-09-05', ate: '2026-09-12', efeito: { raidMult: 1.3 },  txt: '+30% recompensa de saque' }
+];
+function eventosAtivos() {
+  if (process.env.GATO_EVENTOS === 'off') return [];
+  const hoje = todayStr();
+  return EVENTS.filter(e => e.de <= hoje && hoje <= e.ate).map(e => ({
+    id: e.id, nome: e.nome, e: e.e, txt: e.txt, ate: e.ate,
+    dias: Math.max(0, Math.ceil((new Date(e.ate + 'T23:59:59Z') - Date.now()) / 86400000)),
+    efeito: e.efeito
+  }));
+}
+function efeitoTotal(key) {
+  let mult = 1;
+  for (const ev of eventosAtivos()) if (ev.efeito && ev.efeito[key]) mult += (ev.efeito[key] - 1);
+  return mult;
+}
+
+// ---- DESBLOQUEIOS POR NÍVEL (dicas de progressão do jogador) -------------
+const UNLOCKS = [
+  { lvl: 2,  txt: 'Gato Aventureiro mais fácil de achar 🐈' },
+  { lvl: 4,  txt: 'Escudos protegem mais vezes 🛡️' },
+  { lvl: 6,  txt: 'Prêmios de saque maiores 🎁' },
+  { lvl: 8,  txt: 'Gatos Épicos mais comuns ✨' },
+  { lvl: 12, txt: 'Novos mundos revelados 🌌' },
+  { lvl: 20, txt: 'Gatos Lendários mais comuns 🌟' }
+];
+
 // ---- MOTOR DE VILAS (dados) --------------------------------------------
 function villaDef(id) {
   const n = Math.max(1, Math.min(2000, Number(id) || 1));
@@ -222,6 +254,7 @@ function villageSnapshot(v) {
   let reward = CFG.dailyReward;
   if (day > 1) reward = Math.round(reward * (1 + CFG.streakBase * (day - 1)));
   if (day >= CFG.streakMax) reward = Math.round(reward * CFG.streakFinalMult);
+  const nextUnlock = UNLOCKS.find(u => u.lvl > level) || null;
   return {
     vid: v.vid, world: vdef.world, worldEmoji: vdef.worldEmoji, name: vdef.name,
     inWorld: vdef.inWorld, totalVillages: 2000, maxWorlds: CFG.worlds.length,
@@ -231,6 +264,7 @@ function villageSnapshot(v) {
     catPity: Math.min(100, v.catPity || 0),
     hasRaid: !!(v.raid && v.raid.exp > Date.now()),
     cats: (v.cats || []).length, catTotal: CATS.length, catBonus: computeBonus(v),
+    unlock: nextUnlock ? { lvl: nextUnlock.lvl, txt: nextUnlock.txt } : null,
     missions: missionsSnapshot(v),
     daily: { reward: avail ? reward : 0, day: avail ? day : streak, streak,
              streakMax: CFG.streakMax, available: avail }
@@ -319,14 +353,16 @@ async function spin(db, userId, nick) {
   mm.spins += 1; v.missions = mm; changed = true;
 
   // prêmio em moedas imediato (baú paga só na abertura do saque)
+  const evCoins = efeitoTotal('coinsMult');
+  const evCat = efeitoTotal('catMult');
   let rawWin = win;
-  if (win > 0 && kind !== 'raid') rawWin = Math.floor(win * (1 + bonus.coins / 100));
+  if (win > 0 && kind !== 'raid') rawWin = Math.floor(win * (1 + bonus.coins / 100) * evCoins);
   if (rawWin > 0 && kind !== 'raid') { credited = await db.dbAddCoins(userId, rawWin); out.win = rawWin; }
 
   if (kind === 'cat') {
     let drop = out.single !== true;
     if (!drop) {
-      const pity = (v.catPity || 0) + CFG.catSinglePity;
+      const pity = (v.catPity || 0) + CFG.catSinglePity * evCat;
       if (pity >= 100) { v.catPity = 0; drop = true; }
       else v.catPity = pity;
     }
@@ -338,17 +374,17 @@ async function spin(db, userId, nick) {
         v.cats = (v.cats || []).concat(d.cat.id);
         if (v.cats.length >= CATS.length && !v.collectionRewarded) {
           v.collectionRewarded = true;
-          const col = 200 + Math.round(100 * (1 + bonus.coins / 100));
-          await db.dbAddCoins(userId, col);
+const col = Math.floor((200 + Math.round(100 * (1 + bonus.coins / 100))) * evCoins);
+        await db.dbAddCoins(userId, col);
           out.collection = { complete: true, reward: col };
         }
         stats.cats++;
-      } else {
-        const dup = Math.round(d.coins * (1 + bonus.raid / 100));
-        credited = await db.dbAddCoins(userId, dup);
-        out.win += dup;
-        stats.dupes++;
-      }
+} else {
+      const dup = Math.round(d.coins * (1 + bonus.raid / 100) * evCoins);
+      credited = await db.dbAddCoins(userId, dup);
+      out.win += dup;
+      stats.dupes++;
+    }
       v.pp = (v.pp || 0) + 6;
     }
   } else if (kind === 'shield') {
@@ -367,7 +403,7 @@ async function spin(db, userId, nick) {
     const target = v.vid < 2000 ? v.vid + 1 : 1;
     const loot = enemyLoot(target);
     let gain = Math.max(10, Math.round(loot * CFG.enemyStealPct));
-    gain = Math.floor(gain * (1 + bonus.coins / 100));
+    gain = Math.floor(gain * (1 + bonus.coins / 100) * evCoins);
     credited = await db.dbAddCoins(userId, gain);
     out.win = gain; out.attack = { target, loot, gain };
     v.pp = (v.pp || 0) + 10;
@@ -426,7 +462,7 @@ async function raid(db, userId, pick) {
   if (!r || r.exp < Date.now()) return { error: 'Este saque expirou. Gire um baú de novo!' };
   if (r.i !== Number(pick)) return { error: 'Tente novamente! Nesse baú tinha poeira 🕸️' };
   const bonus = computeBonus(v);
-  const prize = Math.round(r.coins * (1 + bonus.raid / 100));
+  const prize = Math.round(r.coins * (1 + bonus.raid / 100) * efeitoTotal('raidMult'));
   v.raid = null;
   await db.dbAddCoins(userId, prize);
   await db.dbSetCharacter(userId, { ...(char || {}), village: v });
@@ -551,6 +587,16 @@ async function missionClaim(db, userId, id) {
   };
 }
 
+async function ranking(db, userId, limit = 20) {
+  const rows = await db.dbLeaderboard(limit);
+  const list = rows.map((r, i) => ({
+    pos: i + 1, id: r.id, nick: r.id.slice(0, 14),
+    balance: r.balance, level: r.level, vid: r.vid, cats: r.cats
+  }));
+  const idx = userId ? list.findIndex(r => r.id === userId) : -1;
+  return { top: list, rank: idx === -1 ? null : idx + 1, total: rows.length };
+}
+
 async function village(db, userId) {
   if (!userId) return { error: 'userId obrigatório' };
   const char = await db.dbGetCharacter(userId);
@@ -574,6 +620,8 @@ function snapshot() {
     maxShields: CFG.maxShields,
     catTotal: CATS.length,
     missions: MISSIONS.map(m => ({ id: m.id, name: m.name, icon: m.icon, target: m.target, reward: m.reward })),
+    eventos: eventosAtivos(),
+    unlocks: UNLOCKS,
     recent,
     stats
   };
@@ -581,5 +629,5 @@ function snapshot() {
 
 module.exports = {
   CFG, getConfig, villaDef, collection, spin, raid, build, advance, daily, missionClaim,
-  village, snapshot, status: snapshot, computeWin, dropCat, roll, missionsSnapshot
+  village, ranking, snapshot, status: snapshot, computeWin, dropCat, roll, missionsSnapshot, eventosAtivos
 };

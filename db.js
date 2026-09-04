@@ -199,6 +199,47 @@ async function dbAdminStats() {
   };
 }
 
+// Leaderboard global do Gatinho: nível (PP) primeiro, depois moedas.
+function charRow(id) {
+  const ch = memChars.get(id);
+  const village = (ch && ch.village) || {};
+  const pp = village.pp || 0;
+  return {
+    id,
+    balance: memUsers.has(id) ? memUsers.get(id).balance : 0,
+    level: Math.floor(pp / 250) + 1,
+    pp,
+    vid: village.vid || 1,
+    cats: (village.cats || []).length
+  };
+}
+async function dbLeaderboard(limit = 20) {
+  if (mode === 'memory') {
+    const ids = new Set([...memUsers.keys(), ...memChars.keys()]);
+    const rows = [...ids].map(charRow);
+    rows.sort((a, b) => (b.level - a.level) || (b.balance - a.balance));
+    return rows.slice(0, limit);
+  }
+  const r = await pool.query(
+    `SELECT u.id, u.balance, ch.data
+     FROM users u LEFT JOIN characters ch ON ch.id = u.id`
+  );
+  const rows = r.rows.map(row => {
+    const village = (row.data && row.data.village) || {};
+    const pp = village.pp || 0;
+    return {
+      id: row.id,
+      balance: row.balance,
+      level: Math.floor(pp / 250) + 1,
+      pp,
+      vid: village.vid || 1,
+      cats: (village.cats || []).length
+    };
+  });
+  rows.sort((a, b) => (b.level - a.level) || (b.balance - a.balance));
+  return rows.slice(0, limit);
+}
+
 module.exports = {
   initDb,
   dbGetUser,
@@ -210,5 +251,6 @@ module.exports = {
   dbGetCharacter,
   dbSetCharacter,
   dbAdminStats,
+  dbLeaderboard,
   defaultChar
 };

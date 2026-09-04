@@ -481,6 +481,16 @@ app.post('/api/turbo/cashout', async (req, res) => {
 
 app.get('/api/gato/status', (req, res) => res.json(gato.status()));
 
+app.get('/api/gato/ranking', async (req, res) => {
+  try {
+    const r = await gato.ranking(db, String(req.query.userId || ''));
+    res.json(r);
+  } catch (err) {
+    console.error('Erro no ranking do gato:', err.message);
+    res.status(500).json({ error: 'Erro no ranking' });
+  }
+});
+
 app.get('/api/gato/collection', async (req, res) => {
   try {
     const r = await gato.collection(db, String(req.query.userId || ''));

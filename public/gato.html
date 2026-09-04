@@ -164,6 +164,21 @@
   .catcard.r-epico { border-color:rgba(192,132,252,.5); box-shadow:0 8px 22px rgba(192,132,252,.25); }
   .catcard.r-lendario { border-color:rgba(255,217,104,.6); box-shadow:0 8px 26px rgba(255,180,0,.3); }
 
+  /* eventos + ranking */
+  .evts { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin:6px auto 4px; max-width:92vw; }
+  .evt { display:flex; align-items:center; gap:6px; border-radius:999px; padding:6px 12px; font-size:12px; font-weight:800;
+    background:linear-gradient(135deg,rgba(255,180,0,.18),rgba(255,138,0,.08)); border:1px solid rgba(255,217,104,.45);
+    box-shadow:0 4px 12px rgba(0,0,0,.3); color:#ffd968; }
+  .evt .de { font-size:10px; color:#c9a45c; font-weight:700; }
+  .rk { display:flex; flex-direction:column; gap:8px; width:min(350px,94vw); margin:0 auto; }
+  .rk-row { display:flex; align-items:center; gap:10px; border-radius:16px; padding:10px 12px;
+    background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.09); font-size:13px; }
+  .rk-row.me { border-color:#ffd968; background:linear-gradient(135deg,rgba(255,217,104,.16),rgba(255,138,0,.06)); }
+  .rk-pos { flex:0 0 30px; font-weight:900; font-size:16px; }
+  .rk-id { flex:1; text-align:left; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rk-meta { color:#86a07f; font-size:11px; }
+  .rk-val { font-weight:900; color:#ffd968; }
+
   /* modal de saque */
   .modal { position:fixed; inset:0; z-index:60; display:flex; flex-direction:column; justify-content:center; align-items:center;
     background:rgba(6,12,7,.88); backdrop-filter:blur(6px); padding:20px; }
@@ -192,9 +207,11 @@
   <button class="tab on" id="tabSlot">🎰 Máquina</button>
   <button class="tab" id="tabVila">🏠 Vila</button>
   <button class="tab" id="tabCol">🐾 Coleção</button>
+  <button class="tab" id="tabRk">🏆 Ranking</button>
 </div>
 
 <div class="panel" id="panelSlot">
+  <div class="evts" id="events"></div>
   <div class="mascote">🐱</div>
   <div class="machine">
     <div class="slot" id="slot">
@@ -216,6 +233,7 @@
   <div class="vsub" id="vShields">🛡️ 0/5 escudos</div>
   <div class="vlvl">🏘️ Nível <b id="vlvl">1</b> · Progresso</div>
   <div class="prog"><i id="vprog"></i></div>
+  <div class="vsub" id="unlock"></div>
   <button class="daily" id="btnDaily">🎁 Recompensa diária +<span id="drv">40</span> 🪙</button>
   <div class="blds" id="blds"></div>
   <div class="mis-ti">🎯 MISSÕES DE HOJE</div>
@@ -228,6 +246,12 @@
   <div class="vsub" id="colCount">0/10 gatos</div>
   <div class="vsub" id="colBonus"></div>
   <div class="catgrid" id="catgrid"></div>
+</div>
+
+<div class="panel hidden" id="panelRk">
+  <div class="col-ti">🏆 RANKING GLOBAL</div>
+  <div class="vsub" id="rkMe"></div>
+  <div class="rk" id="rkList"></div>
 </div>
 
 <div class="recent">
@@ -376,6 +400,7 @@
     $('vShields').textContent='🛡️ '+v.shields+'/'+v.maxShields+' escudos'+(v.shields>0?' (protegido)':'');
     $('vlvl').textContent=v.level;
     $('pity').textContent='🐾 Próximo gato: '+Math.round(v.catPity||0)+'%';
+    $('unlock').textContent = v.unlock ? ('🔓 Nível '+v.unlock.lvl+' desbloqueia: '+v.unlock.txt) : '🔓 Nível máximo! Todos os desbloqueios';
     const epoch=v.pp-(v.level-1)*v.ppPerLevel;
     $('vprog').style.width=(v.ppPerLevel? epoch/v.ppPerLevel*100 : 0)+'%';
     $('btnDaily').disabled=!v.daily.available;
@@ -477,6 +502,24 @@
       spinCost=d.spinCost; $('custo').textContent=spinCost;
       order=d.buildings||[];
       renderRecent(d.recent||[]);
+      $('events').innerHTML=(d.eventos||[]).map(e=>
+        '<span class="evt">'+e.e+' '+e.nome+' <span class="de">'+e.txt+' · '+e.dias+'d</span></span>'
+      ).join('');
+    }).catch(()=>{});
+  }
+
+  function renderRanking(){
+    fetch(API+'/api/gato/ranking?userId='+userId).then(r=>r.json()).then(d=>{
+      if(d.error) return;
+      $('rkMe').textContent = d.rank ? ('Tua posição: #'+d.rank+' de '+d.total) : 'Saldo 0 — gira pra entrar no ranking!';
+      $('rkList').innerHTML=(d.top||[]).map(r=>{
+        const medal = r.pos===1?'🥇':(r.pos===2?'🥈':(r.pos===3?'🥉':r.pos));
+        return '<div class="rk-row'+(r.id===userId?' me':'')+'">'+
+          '<span class="rk-pos">'+medal+'</span>'+
+          '<span class="rk-id">'+r.nick+'</span>'+
+          '<span class="rk-meta">L'+r.level+' · V'+r.vid+' · '+r.cats+'🐾</span>'+
+          '<span class="rk-val">'+fmt(r.balance)+'🪙</span></div>';
+      }).join('');
     }).catch(()=>{});
   }
 
@@ -484,13 +527,14 @@
   $('btnDaily').onclick=diaria;
   $('raidClose').onclick=fecharSaque;
   function tab(id, on){
-    ['tabSlot','tabVila','tabCol'].forEach(t=>$(t).className='tab'+(t===id?' on':''));
-    ['panelSlot','panelVila','panelCol'].forEach(p=>$(p).classList.add('hidden'));
+    ['tabSlot','tabVila','tabCol','tabRk'].forEach(t=>$(t).className='tab'+(t===id?' on':''));
+    ['panelSlot','panelVila','panelCol','panelRk'].forEach(p=>$(p).classList.add('hidden'));
     $(on).classList.remove('hidden');
   }
   $('tabSlot').onclick=()=>tab('tabSlot','panelSlot');
   $('tabVila').onclick=()=>{ tab('tabVila','panelVila'); carregarVila(); };
   $('tabCol').onclick=()=>{ tab('tabCol','panelCol'); renderColecao(); };
+  $('tabRk').onclick=()=>{ tab('tabRk','panelRk'); renderRanking(); };
 
   fetch(API+'/api/balance/'+userId).then(r=>r.json()).then(d=>setCoins(d.balance)).catch(()=>{});
   status(); setInterval(status,5000);
