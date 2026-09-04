@@ -1,37 +1,44 @@
 // Gatinho — motor de vilas (Village Engine) + máquina de giros.
 // PRINCÍPIO: UMA vila NÃO são 2000 telas — é 1 motor dirigido por dados.
 //   vila_id = 1..2000 → villaDef(id) gera nome/mundo/tema/custos na hora.
-// Configuração central aqui embaixo (CFG) — tudo vem de um lugar só.
 const CFG = {
   spinCost: Number(process.env.GT_SPIN_COST) || 20,
   dailyReward: Number(process.env.GT_DAILY_REWARD) || 40,
-  villageCostGrowth: Number(process.env.GT_COST_GROWTH) || 0.06, // +6% de custo por vila
+  villageCostGrowth: Number(process.env.GT_COST_GROWTH) || 0.06,
   ppPerLevel: Number(process.env.GT_PP_PER_LEVEL) || 250,
   buildingsPerVillage: 5,
-  tiers: 5,                       // cada construção tem 5 níveis
-  tierMult: [1, 1.6, 2.5, 4, 6],  // multiplicador de custo por nível
+  tiers: 5,
+  tierMult: [1, 1.6, 2.5, 4, 6],
   tierXp: [10, 15, 25, 40, 60],
-  maxShields: 5,                  // limite de escudos de proteção
-  shieldPair: 1,                  // escudos por dupla
-  shieldTriple: 3,                // escudos por trinca
-  raidPrizeMult: 8,               // trinca de baú: prêmio = custo x isto
-  raidExpiryMs: 120000,           // prazo para abrir o saque (baús)
-  enemyStealPct: 0.15,            // % que o rato leva do alvo (ataque)
-  defenseChance: 0.06,            // chance de um bot atacar você por giro
-  defenseLossPct: 0.04,           // % do saldo perdido sem escudo
+  maxShields: 5,
+  shieldPair: 1,
+  shieldTriple: 3,
+  raidPrizeMult: 8,
+  raidExpiryMs: 120000,
+  enemyStealPct: 0.15,
+  defenseChance: 0.06,
+  defenseLossPct: 0.04,
   defenseLossMin: 5,
   defenseLossMax: 80,
+  catDrop: { comum: 60, raro: 27, epico: 10, lendario: 3 },
+  catDupe: { comum: 20, raro: 50, epico: 120, lendario: 300 },
+  catTripleCoins: 4,
+  catSinglePity: 15,
+  luckConsolation: 10,
+  streakBase: 0.25,
+  streakMax: 7,
+  streakFinalMult: 2.5,
   syms: [
-    { e: '🐱', w: 5,  kind: 'coins', p2: 2,   p3: 10 },   // gato raro
-    { e: '🐟', w: 13, kind: 'coins', p2: 1.4, p3: 4  },   // peixinho
-    { e: '🧶', w: 15, kind: 'coins', p2: 1.2, p3: 3  },   // novelo
-    { e: '🥛', w: 15, kind: 'coins', p2: 1.1, p3: 2.5},   // leite
-    { e: '🐁', w: 18, kind: 'coins', p2: 1,   p3: null },  // rato: trinca = ATAQUE (🥷)
-    { e: '🛡️', w: 12, kind: 'shield', p2: 0,   p3: 0.5 },  // escudo / proteção
-    { e: '🎁', w: 12, kind: 'raid', p2: 0,   p3: null },   // baú: dupla/trinca = SAQUE
-    { e: '❌', w: 26, kind: 'lose', p2: 0,   p3: 0  }      // nada (perde)
+    { e: '🐱', w: 5,  kind: 'coins', p2: 2,   p3: 10 },
+    { e: '🐟', w: 13, kind: 'coins', p2: 1.4, p3: 4  },
+    { e: '🧶', w: 15, kind: 'coins', p2: 1.2, p3: 3  },
+    { e: '🥛', w: 15, kind: 'coins', p2: 1.1, p3: 2.5},
+    { e: '🐁', w: 18, kind: 'coins', p2: 1,   p3: null },
+    { e: '🛡️', w: 12, kind: 'shield', p2: 0,   p3: 0.5 },
+    { e: '🎁', w: 12, kind: 'raid', p2: 0,   p3: null },
+    { e: '🐾', w: 14, kind: 'cat', p2: 0,   p3: null },
+    { e: '❌', w: 22, kind: 'lose', p2: 0,   p3: 0  }
   ],
-  // as 5 construções da vila (cada uma evolui do nível 1 ao 5)
   buildings: [
     { id: 'gato',  nome: 'Casinha do Gato', e: '🏠', custo: 50 },
     { id: 'peixe', nome: 'Lago de Peixes',  e: '🐟', custo: 120 },
@@ -39,7 +46,6 @@ const CFG = {
     { id: 'rac',   nome: 'Casa de Ração',   e: '🥣', custo: 500 },
     { id: 'cast',  nome: 'Castelo do Gato', e: '🏰', custo: 1000 }
   ],
-  // 20 mundos × 100 vilas = 2.000 vilas (temas trocáveis sem tocar no motor)
   worlds: ['Mundo Inicial', 'Floresta', 'Praia', 'Montanhas', 'Cidade', 'Deserto',
            'Neve', 'Espaço', 'Mundo Mágico', 'Submarino', 'Futurista',
            'Ilhas Tropicais', 'Reino dos Gatos', 'Mundo Antigo', 'Mundo Mecânico',
@@ -49,8 +55,31 @@ const CFG = {
                '🤖', '🏝️', '👑', '🏺', '⚙️', '🐉', '🌌', '💤', '✨', '🔥']
 };
 
+// ---- COLEÇÃO DE GATOS (configuráveis; bônus somados no servidor) ---------
+const CATS = [
+  { id: 'c1', nome: 'Gato Malhado',  e: '🐈', rar: 'comum',    b: { coins: 0,  raid: 0,  luck: 0 },  desc: 'O queridinho da vila.' },
+  { id: 'c2', nome: 'Gato Branco',   e: '🐱', rar: 'comum',    b: { coins: 2,  raid: 0,  luck: 0 },  desc: 'Dorminhoco profissional.' },
+  { id: 'c3', nome: 'Gato Aventureiro', e: '🧭', rar: 'raro',  b: { coins: 5,  raid: 0,  luck: 0 },  desc: '+5% moedas nos giros.' },
+  { id: 'c4', nome: 'Gato Pirata',   e: '🏴‍☠️', rar: 'raro',    b: { coins: 0,  raid: 10, luck: 0 },  desc: '+10% recompensa de saque.' },
+  { id: 'c5', nome: 'Gato Mágico',   e: '✨', rar: 'raro',     b: { coins: 0,  raid: 0,  luck: 5 },   desc: '+5% chance de bônus.' },
+  { id: 'c6', nome: 'Gato Ninja',    e: '🥷', rar: 'epico',    b: { coins: 8,  raid: 0,  luck: 0 },  desc: '+8% moedas. Silencioso.' },
+  { id: 'c7', nome: 'Gato Real',     e: '👑', rar: 'epico',    b: { coins: 0,  raid: 15, luck: 0 },  desc: '+15% recompensa de saque.' },
+  { id: 'c8', nome: 'Gato Estrela',  e: '🌟', rar: 'epico',    b: { coins: 0,  raid: 0,  luck: 8 },   desc: '+8% chance de bônus.' },
+  { id: 'c9', nome: 'Gato Dragão',   e: '🐉', rar: 'lendario', b: { coins: 15, raid: 10, luck: 0 },  desc: '+15% moedas e +10% saque.' },
+  { id: 'c10',nome: 'Gato Galáctico',e: '🌌', rar: 'lendario', b: { coins: 20, raid: 20, luck: 10 }, desc: '+20% tudo. Lenda total.' }
+];
+const RAR_LABEL = { comum: 'Comum', raro: 'Raro', epico: 'Épico', lendario: 'Lendário' };
+
+// ---- MISSÕES DIÁRIAS (configuráveis) -------------------------------------
+const MISSIONS = [
+  { id: 'm1', name: 'Faça 10 giros',        type: 'spins',   target: 10, reward: 120, icon: '🎰' },
+  { id: 'm2', name: 'Construa 3 edifícios', type: 'builds',  target: 3,  reward: 150, icon: '🔨' },
+  { id: 'm3', name: 'Faça 2 ataques',       type: 'attacks', target: 2,  reward: 200, icon: '🥷' },
+  { id: 'm4', name: 'Complete uma vila',    type: 'villas',  target: 1,  reward: 250, icon: '🚀' }
+];
+
 let stats = { spins: 0, coinsSpent: 0, coinsWon: 0, players: 0, villages: 0, advances: 0,
-              raids: 0, attacks: 0, shields: 0, defenses: 0 };
+              raids: 0, attacks: 0, shields: 0, defenses: 0, cats: 0, dupes: 0, missions: 0 };
 const playersSet = new Set();
 const recent = [];
 
@@ -67,6 +96,9 @@ function seeded(seed) {
   };
 }
 
+function todayStr() { return new Date().toISOString().slice(0, 10); }
+function yesterdayStr() { return new Date(Date.now() - 86400000).toISOString().slice(0, 10); }
+
 // ---- MOTOR DE VILAS (dados) --------------------------------------------
 function villaDef(id) {
   const n = Math.max(1, Math.min(2000, Number(id) || 1));
@@ -78,17 +110,17 @@ function villaDef(id) {
     base: Math.round(b.custo * (1 + i * 0.15) * growth)
   }));
   return {
-    id: n,
-    world: CFG.worlds[wIdx],
-    worldEmoji: CFG.worldEmoji[wIdx],
-    name: `${CFG.worldEmoji[wIdx]} Vila ${n}`,
-    inWorld,
-    buildings: blds
+    id: n, world: CFG.worlds[wIdx], worldEmoji: CFG.worldEmoji[wIdx],
+    name: `${CFG.worldEmoji[wIdx]} Vila ${n}`, inWorld, buildings: blds
   };
 }
 
 function defaultVillage() {
-  return { vid: 1, built: {}, coinsSpent: 0, pp: 0, level: 1, lastDaily: null, advances: 0, shields: 0, raid: null };
+  return {
+    vid: 1, built: {}, coinsSpent: 0, pp: 0, level: 1, lastDaily: null, advances: 0,
+    shields: 0, raid: null, cats: [], collectionRewarded: false, streak: 0, catPity: 0,
+    missions: { day: todayStr(), spins: 0, builds: 0, attacks: 0, villas: 0, claimed: {} }
+  };
 }
 
 // "fortuna" de uma vila adversária (bot) — determinística por vila e dia
@@ -101,15 +133,13 @@ function enemyLoot(vid) {
 }
 
 function buildCost(vdef, tier) {
-  const b = vdef.buildings[tier.bi];
-  return Math.round(b.base * CFG.tierMult[tier.tier - 1]);
+  return Math.round(vdef.buildings[tier.bi].base * CFG.tierMult[tier.tier - 1]);
 }
 
 function makeBuiltMap(v) {
   const out = {};
   const raw = v.built || {};
-  // migração: registros antigos guardavam só `idx` (1 ciclo por construção)
-  if (raw.idx != null && CFG.buildings[raw.idx]) {
+  if (raw.idx != null && CFG.buildings[raw.idx]) { // migração formato antigo
     out[CFG.buildings[raw.idx].id] = 5;
     return out;
   }
@@ -123,7 +153,52 @@ function nextBuildIndex(vdef, built) {
   for (let i = 0; i < CFG.buildings.length; i++) {
     if ((built[CFG.buildings[i].id] || 0) < CFG.tiers) return i;
   }
-  return -1; // vila completa
+  return -1;
+}
+
+function getShields(v) { return Math.min(CFG.maxShields, v.shields || 0); }
+function setShields(v, n) { v.shields = Math.max(0, Math.min(CFG.maxShields, n)); }
+
+// bônus somados de toda a coleção (servidor calcula)
+function computeBonus(v) {
+  const b = { coins: 0, raid: 0, luck: 0 };
+  for (const cid of (v.cats || [])) {
+    const c = CATS.find(x => x.id === cid);
+    if (c) { b.coins += c.b.coins; b.raid += c.b.raid; b.luck += c.b.luck; }
+  }
+  return b;
+}
+
+// roleta de gatos do drop da 🐾 (servidor decide)
+function dropCat(v) {
+  const owned = v.cats || [];
+  const s = seeded((v.vid || 1) * 131 + Date.now() % 100000);
+  let r = s() * 100, pool = [], rar = 'comum';
+  if (r < CFG.catDrop.comum) pool = CATS.filter(c => c.rar === 'comum');
+  else if (r < CFG.catDrop.comum + CFG.catDrop.raro) { pool = CATS.filter(c => c.rar === 'raro'); rar = 'raro'; }
+  else if (r < CFG.catDrop.comum + CFG.catDrop.raro + CFG.catDrop.epico) { pool = CATS.filter(c => c.rar === 'epico'); rar = 'epico'; }
+  else { pool = CATS.filter(c => c.rar === 'lendario'); rar = 'lendario'; }
+  const cat = pool[Math.floor(s() * pool.length)];
+  if (owned.includes(cat.id)) return { cat, nova: false, coins: CFG.catDupe[cat.rar] };
+  return { cat, nova: true, coins: 0 };
+}
+
+function canClaimDaily(v) { return v.lastDaily !== todayStr(); }
+
+function missionDay(v) {
+  const m = v.missions || {};
+  if (m.day !== todayStr()) return { day: todayStr(), spins: 0, builds: 0, attacks: 0, villas: 0, claimed: {} };
+  return m;
+}
+
+function missionsSnapshot(v) {
+  const m = missionDay(v);
+  return MISSIONS.map(md => ({
+    id: md.id, name: md.name, icon: md.icon, target: md.target, reward: md.reward,
+    current: Math.min(md.target, m[md.type] || 0),
+    done: (m[md.type] || 0) >= md.target,
+    claimed: !!(m.claimed && m.claimed[md.id])
+  }));
 }
 
 function villageSnapshot(v) {
@@ -141,36 +216,25 @@ function villageSnapshot(v) {
     const t = { bi: nextBi, id: b.id, nome: b.nome, e: b.e, tier, max: CFG.tiers };
     next = { ...t, custo: buildCost(vdef, t) };
   }
+  const avail = canClaimDaily(v);
+  const streak = (v.lastDaily === yesterdayStr()) ? Math.min(CFG.streakMax, v.streak || 0) : 0;
+  const day = streak === CFG.streakMax ? CFG.streakMax : streak + 1;
+  let reward = CFG.dailyReward;
+  if (day > 1) reward = Math.round(reward * (1 + CFG.streakBase * (day - 1)));
+  if (day >= CFG.streakMax) reward = Math.round(reward * CFG.streakFinalMult);
   return {
-    vid: v.vid,
-    world: vdef.world,
-    worldEmoji: vdef.worldEmoji,
-    name: vdef.name,
-    inWorld: vdef.inWorld,
-    totalVillages: 2000,
-    maxWorlds: CFG.worlds.length,
-    level,
-    pp,
-    ppPerLevel: CFG.ppPerLevel,
-    xpToNext,
-    built,
-    complete,
-    next,
-    coinsSpent: v.coinsSpent || 0,
-    advances: v.advances || 0,
-    shields: Math.min(CFG.maxShields, v.shields || 0),
-    maxShields: CFG.maxShields,
+    vid: v.vid, world: vdef.world, worldEmoji: vdef.worldEmoji, name: vdef.name,
+    inWorld: vdef.inWorld, totalVillages: 2000, maxWorlds: CFG.worlds.length,
+    level, pp, ppPerLevel: CFG.ppPerLevel, xpToNext, built, complete, next,
+    coinsSpent: v.coinsSpent || 0, advances: v.advances || 0,
+    shields: getShields(v), maxShields: CFG.maxShields,
+    catPity: Math.min(100, v.catPity || 0),
     hasRaid: !!(v.raid && v.raid.exp > Date.now()),
-    daily: {
-      reward: CFG.dailyReward,
-      available: canClaimDaily(v)
-    }
+    cats: (v.cats || []).length, catTotal: CATS.length, catBonus: computeBonus(v),
+    missions: missionsSnapshot(v),
+    daily: { reward: avail ? reward : 0, day: avail ? day : streak, streak,
+             streakMax: CFG.streakMax, available: avail }
   };
-}
-
-function canClaimDaily(v) {
-  const today = new Date().toISOString().slice(0, 10);
-  return v.lastDaily !== today;
 }
 
 function pickWeighted() {
@@ -192,30 +256,45 @@ function computeWin(rollRes, cost) {
   const groups = {};
   for (const s of rollRes) groups[s.e] = (groups[s.e] || 0) + 1;
 
-  // ESPECIAIS
-  const specials = ['🛡️', '🎁', '🐁'];
-  for (const e of specials) {
+  for (const e of ['🛡️', '🎁', '🐁', '🐾']) {
     if (groups[e] === 3) {
       if (e === '🛡️') return { win: Math.floor(cost * 0.5), kind: 'shield', guard: CFG.shieldTriple };
       if (e === '🎁') return { win: Math.floor(cost * CFG.raidPrizeMult), kind: 'raid' };
-      if (e === '🐁') return { win: 0, kind: 'attack' }; // 🥷 rato ataca!
+      if (e === '🐁') return { win: 0, kind: 'attack' };
+      if (e === '🐾') return { win: Math.floor(cost * CFG.catTripleCoins), kind: 'cat' };
     }
-    if (groups[e] === 2 && e === '🛡️') return { win: 0, kind: 'shield', guard: CFG.shieldPair };
-    if (groups[e] === 2 && e === '🎁') return { win: 0, kind: 'raid' };
+    if (groups[e] === 2) {
+      if (e === '🛡️') return { win: 0, kind: 'shield', guard: CFG.shieldPair };
+      if (e === '🎁') return { win: 0, kind: 'raid' };
+      if (e === '🐾') return { win: 0, kind: 'cat' };
+    }
   }
-  // O resto paga moedas no par/trinca
-  const sym = uniform ? a : (groups[a.e] === 2 || groups[b.e] === 2 || groups[c.e] === 2
-    ? (groups[a.e] === 2 ? a : (groups[b.e] === 2 ? b : c)) : null);
-  if (!sym || sym.kind !== 'coins' || sym.p2 === 0) return { win: 0, kind: 'none' };
+  const sym = uniform ? a : (groups[a.e] === 2 ? a : (groups[b.e] === 2 ? b : (groups[c.e] === 2 ? c : null)));
+  if (!sym || sym.kind !== 'coins' || sym.p2 === 0) {
+    if (groups['🐾'] > 0) return { win: 0, kind: 'cat', single: groups['🐾'] === 1 };
+    return { win: 0, kind: 'none' };
+  }
   if (uniform && sym.p3) return { win: Math.floor(cost * sym.p3), kind: 'all', e: sym.e };
-  if (!uniform && groups[sym.e] === 2) return { win: Math.floor(cost * sym.p2), kind: 'pair', e: sym.e };
+  if (!uniform) return { win: Math.floor(cost * sym.p2), kind: 'pair', e: sym.e };
   return { win: 0, kind: 'none' };
 }
 
-// Conta os escudos atuais de um villager (persistidos em v.shields)
-function getShields(v) { return Math.min(CFG.maxShields, v.shields || 0); }
-
-function setShields(v, n) { v.shields = Math.max(0, Math.min(CFG.maxShields, n)); }
+async function collection(db, userId) {
+  if (!userId) return { error: 'userId obrigatório' };
+  const char = await db.dbGetCharacter(userId);
+  const v = { ...defaultVillage(), ...((char && char.village) || {}) };
+  const owned = v.cats || [];
+  return {
+    cats: CATS.map(c => ({
+      id: c.id, nome: c.nome, e: c.e, rar: c.rar, rarLabel: RAR_LABEL[c.rar], desc: c.desc, b: c.b,
+      owned: owned.includes(c.id)
+    })),
+    owned: owned.length, total: CATS.length,
+    complete: owned.length >= CATS.length,
+    rewardAwarded: !!v.collectionRewarded,
+    bonus: computeBonus(v)
+  };
+}
 
 // ---- AÇÕES --------------------------------------------------------------
 
@@ -230,40 +309,81 @@ async function spin(db, userId, nick) {
   let credited = null;
   const out = { ok: true, syms: rollRes.map(s => s.e), kind, e, win: 0, guard: 0, balance: null, defense: null };
 
-  // carrega vila p/ efeitos de estado (escudo, saque, ataque)
   const char = await db.dbGetCharacter(userId);
   const v = { ...defaultVillage(), ...((char && char.village) || {}) };
+  const bonus = computeBonus(v);
   let changed = false;
 
-  // prêmio em moedas imediato (baú paga só na abertura do saque)
-  if (win > 0 && kind !== 'raid') { credited = await db.dbAddCoins(userId, win); out.win = win; }
+  // contadores de missão (resetam no dia)
+  const mm = missionDay(v);
+  mm.spins += 1; v.missions = mm; changed = true;
 
-  if (kind === 'shield') {
+  // prêmio em moedas imediato (baú paga só na abertura do saque)
+  let rawWin = win;
+  if (win > 0 && kind !== 'raid') rawWin = Math.floor(win * (1 + bonus.coins / 100));
+  if (rawWin > 0 && kind !== 'raid') { credited = await db.dbAddCoins(userId, rawWin); out.win = rawWin; }
+
+  if (kind === 'cat') {
+    let drop = out.single !== true;
+    if (!drop) {
+      const pity = (v.catPity || 0) + CFG.catSinglePity;
+      if (pity >= 100) { v.catPity = 0; drop = true; }
+      else v.catPity = pity;
+    }
+    out.catPity = Math.min(100, v.catPity || 0);
+    if (drop) {
+      const d = dropCat(v);
+      out.cat = { id: d.cat.id, nome: d.cat.nome, e: d.cat.e, rar: d.cat.rar, rarLabel: RAR_LABEL[d.cat.rar], nova: d.nova };
+      if (d.nova) {
+        v.cats = (v.cats || []).concat(d.cat.id);
+        if (v.cats.length >= CATS.length && !v.collectionRewarded) {
+          v.collectionRewarded = true;
+          const col = 200 + Math.round(100 * (1 + bonus.coins / 100));
+          await db.dbAddCoins(userId, col);
+          out.collection = { complete: true, reward: col };
+        }
+        stats.cats++;
+      } else {
+        const dup = Math.round(d.coins * (1 + bonus.raid / 100));
+        credited = await db.dbAddCoins(userId, dup);
+        out.win += dup;
+        stats.dupes++;
+      }
+      v.pp = (v.pp || 0) + 6;
+    }
+  } else if (kind === 'shield') {
     setShields(v, getShields(v) + guard);
     out.guard = guard;
-    v.pp = (v.pp || 0) + 5; changed = true; stats.shields += guard;
+    v.pp = (v.pp || 0) + 5;
+    stats.shields += guard;
   } else if (kind === 'raid') {
     const s = seeded(userId.length * 31 + Date.now() % 100000);
-    const loot = s() * 0.4 + 0.3; // fator do prêmio do baú
-    v.raid = { i: Math.floor(s() * 3), coins: Math.max(10, Math.round(loot * win)), exp: Date.now() + CFG.raidExpiryMs };
-    // 🎁 baú pode vir sem prêmio grande: usa trinca=win
-    if (v.raid.coins <= 0) v.raid = { i: Math.floor(s() * 3), coins: 20, exp: Date.now() + CFG.raidExpiryMs };
-    changed = true; stats.raids++;
+    const loot = s() * 0.4 + 0.3;
+    const coins = Math.max(10, Math.round(loot * win) || 20);
+    v.raid = { i: Math.floor(s() * 3), coins, exp: Date.now() + CFG.raidExpiryMs };
+    stats.raids++;
   } else if (kind === 'attack') {
-    // 🥷 o rato ataca uma vila adversária (bot) e rouba moedas
+    mm.attacks += 1;
     const target = v.vid < 2000 ? v.vid + 1 : 1;
     const loot = enemyLoot(target);
-    const gain = Math.max(10, Math.round(loot * CFG.enemyStealPct));
+    let gain = Math.max(10, Math.round(loot * CFG.enemyStealPct));
+    gain = Math.floor(gain * (1 + bonus.coins / 100));
     credited = await db.dbAddCoins(userId, gain);
     out.win = gain; out.attack = { target, loot, gain };
-    v.pp = (v.pp || 0) + 10; changed = true; stats.attacks++;
+    v.pp = (v.pp || 0) + 10;
+    stats.attacks++;
+  } else if (kind === 'none' && bonus.luck > 0 && Math.random() < (bonus.luck * 0.006)) {
+    // sorte dos gatos mágicos: um consolo cai
+    credited = await db.dbAddCoins(userId, CFG.luckConsolation);
+    out.win = CFG.luckConsolation; out.luck = true;
   }
 
-  // contra-ataque de bot: seu escudo bloqueia, senão perde um pouco
+  // contra-ataque de bot: escudo bloqueia, senão perde pouco
   if (Math.random() < CFG.defenseChance) {
     if (getShields(v) > 0) {
       setShields(v, getShields(v) - 1);
-      out.defense = { blocked: true, lost: 0 }; changed = true; stats.defenses++;
+      out.defense = { blocked: true, lost: 0 };
+      stats.defenses++;
     } else {
       const balance = credited ? credited.balance : user.balance - CFG.spinCost;
       const lost = Math.min(balance, Math.max(CFG.defenseLossMin, Math.round(balance * CFG.defenseLossPct)));
@@ -275,7 +395,7 @@ async function spin(db, userId, nick) {
     }
   }
 
-  if (changed) await db.dbSetCharacter(userId, { ...(char || {}), village: v });
+  await db.dbSetCharacter(userId, { ...(char || {}), village: v });
 
   stats.spins++;
   stats.coinsSpent += CFG.spinCost;
@@ -287,15 +407,16 @@ async function spin(db, userId, nick) {
   if (recent.length > 15) recent.pop();
 
   out.balance = credited ? credited.balance : (await db.dbGetUser(userId)).balance;
-
   if (kind === 'raid') {
     out.chests = [0, 1, 2].map(i => ({ i }));
     out.raidExpirySec = Math.floor(CFG.raidExpiryMs / 1000);
   }
+  out.missions = missionsSnapshot(v);
+  out.catPity = Math.min(100, v.catPity || 0);
   return out;
 }
 
-// Abrir o baú escolhido do SAQUE (servidor já decidiu o prêmio no spin)
+// Abrir o baú escolhido do SAQUE (o prêmio foi decidido no giro)
 async function raid(db, userId, pick) {
   if (!userId) return { error: 'userId obrigatório' };
   if (![0, 1, 2].includes(Number(pick))) return { error: 'Escolha inválida' };
@@ -304,10 +425,12 @@ async function raid(db, userId, pick) {
   const r = v.raid;
   if (!r || r.exp < Date.now()) return { error: 'Este saque expirou. Gire um baú de novo!' };
   if (r.i !== Number(pick)) return { error: 'Tente novamente! Nesse baú tinha poeira 🕸️' };
+  const bonus = computeBonus(v);
+  const prize = Math.round(r.coins * (1 + bonus.raid / 100));
   v.raid = null;
-  await db.dbAddCoins(userId, r.coins);
+  await db.dbAddCoins(userId, prize);
   await db.dbSetCharacter(userId, { ...(char || {}), village: v });
-  return { ok: true, prize: r.coins, balance: (await db.dbGetUser(userId)).balance };
+  return { ok: true, prize, balance: (await db.dbGetUser(userId)).balance };
 }
 
 async function build(db, userId) {
@@ -326,6 +449,11 @@ async function build(db, userId) {
   const user = await db.dbGetUser(userId);
   if (user.balance < custo) return { error: `Precisa de ${custo} moedas p/ '${b.nome}' nível ${tier}` };
   await db.dbSpendCoins(userId, custo);
+
+  const mm = missionDay(v);
+  mm.builds += 1;
+  if (nextBuildIndex(vdef, { ...built, [b.id]: tier }) === -1) mm.villas += 1; // completou a vila
+  v.missions = mm;
 
   built[b.id] = tier;
   v.built = built;
@@ -349,14 +477,15 @@ async function advance(db, userId) {
   const built = makeBuiltMap(v);
   if (nextBuildIndex(vdef, built) !== -1) return { error: 'Termine as 5 construções antes de avançar.' };
 
+  const mm = missionDay(v);
+  mm.villas += 1; v.missions = mm;
+
   const bonus = Math.round(150 * (1 + (v.vid - 1) * CFG.villageCostGrowth));
   await db.dbAddCoins(userId, bonus);
   const oldWorld = vdef.world;
   v.vid = Math.min(2000, v.vid + 1);
   v.built = {};
   v.advances = (v.advances || 0) + 1;
-
-  // recompensa a XP ao concluir a vila
   v.pp = (v.pp || 0) + 20;
   await db.dbSetCharacter(userId, { ...(char || {}), village: v });
 
@@ -378,14 +507,47 @@ async function daily(db, userId) {
   const char = await db.dbGetCharacter(userId);
   const v = { ...defaultVillage(), ...((char && char.village) || {}) };
   if (!canClaimDaily(v)) return { error: 'Diária já resgatada hoje. Volte amanhã!' };
-  const today = new Date().toISOString().slice(0, 10);
-  v.lastDaily = today;
-  await db.dbAddCoins(userId, CFG.dailyReward);
+
+  // calendário de 7 dias: vem de ontem → mantém/avança sequência, senão recomeça
+  let streak = v.lastDaily === yesterdayStr() ? (v.streak || 0) : 0;
+  streak = Math.min(CFG.streakMax, streak + 1);
+  let reward = streak > 1 ? Math.round(CFG.dailyReward * (1 + CFG.streakBase * (streak - 1))) : CFG.dailyReward;
+  if (streak >= CFG.streakMax) reward = Math.round(reward * CFG.streakFinalMult);
+
+  v.lastDaily = todayStr();
+  v.streak = streak;
+  await db.dbAddCoins(userId, reward);
   await db.dbSetCharacter(userId, { ...(char || {}), village: v });
   return {
     ok: true,
-    reward: CFG.dailyReward,
+    reward,
+    streak,
+    streakMax: CFG.streakMax,
     balance: (await db.dbGetUser(userId)).balance
+  };
+}
+
+async function missionClaim(db, userId, id) {
+  if (!userId) return { error: 'userId obrigatório' };
+  const md = MISSIONS.find(x => x.id === id);
+  if (!md) return { error: 'Missão inválida' };
+  const char = await db.dbGetCharacter(userId);
+  const v = { ...defaultVillage(), ...((char && char.village) || {}) };
+  const mm = missionDay(v);
+  if ((mm[md.type] || 0) < md.target) return { error: `Faltam completar: ${md.name}` };
+  if (mm.claimed && mm.claimed[md.id]) return { error: 'Recompensa já coletada' };
+  mm.claimed = { ...(mm.claimed || {}), [md.id]: true };
+  v.missions = mm;
+  v.pp = (v.pp || 0) + 10;
+  await db.dbAddCoins(userId, md.reward);
+  await db.dbSetCharacter(userId, { ...(char || {}), village: v });
+  stats.missions++;
+  return {
+    ok: true,
+    reward: md.reward,
+    xp: 10,
+    balance: (await db.dbGetUser(userId)).balance,
+    missions: missionsSnapshot(v)
   };
 }
 
@@ -410,21 +572,14 @@ function snapshot() {
     maxWorlds: CFG.worlds.length,
     worlds: CFG.worlds.map((w, i) => ({ name: w, emoji: CFG.worldEmoji[i] })),
     maxShields: CFG.maxShields,
+    catTotal: CATS.length,
+    missions: MISSIONS.map(m => ({ id: m.id, name: m.name, icon: m.icon, target: m.target, reward: m.reward })),
     recent,
     stats
   };
 }
 
 module.exports = {
-  CFG,
-  getConfig,
-  villaDef,
-  spin,
-  raid,
-  build,
-  advance,
-  daily,
-  village,
-  snapshot,
-  status: snapshot
+  CFG, getConfig, villaDef, collection, spin, raid, build, advance, daily, missionClaim,
+  village, snapshot, status: snapshot, computeWin, dropCat, roll, missionsSnapshot
 };

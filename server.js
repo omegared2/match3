@@ -481,6 +481,30 @@ app.post('/api/turbo/cashout', async (req, res) => {
 
 app.get('/api/gato/status', (req, res) => res.json(gato.status()));
 
+app.get('/api/gato/collection', async (req, res) => {
+  try {
+    const r = await gato.collection(db, String(req.query.userId || ''));
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    console.error('Erro na coleção do gato:', err.message);
+    res.status(500).json({ error: 'Erro na coleção' });
+  }
+});
+
+app.post('/api/gato/mission-claim', async (req, res) => {
+  try {
+    const { userId, id } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
+    const r = await gato.missionClaim(db, userId, id);
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    console.error('Erro na missão do gato:', err.message);
+    res.status(500).json({ error: 'Erro na missão' });
+  }
+});
+
 app.get('/api/gato/village', async (req, res) => {
   try {
     const r = await gato.village(db, String(req.query.userId || ''));

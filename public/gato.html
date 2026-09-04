@@ -131,6 +131,39 @@
     box-shadow:0 12px 30px rgba(0,0,0,.5); opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; }
   .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
 
+  /* missões */
+  .mis-ti { font-size:12px; color:#ffd968; letter-spacing:2px; margin:14px 0 8px; font-weight:800; }
+  .miss { display:flex; align-items:center; gap:10px; border-radius:16px; padding:10px 12px; margin-bottom:8px;
+    background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.09); text-align:left; }
+  .miss .mi { font-size:26px; flex:0 0 auto; }
+  .miss .mbody { flex:1; min-width:0; }
+  .miss .mn { font-size:14px; font-weight:800; }
+  .miss .mp { display:flex; height:6px; border-radius:999px; background:rgba(255,255,255,.12); margin-top:6px; overflow:hidden; }
+  .miss .mp i { display:block; height:100%; background:linear-gradient(90deg,#ffd968,#ff8a00); width:0; transition:width .4s; }
+  .miss.done { border-color:#4ade80; }
+  .miss .claim { flex:0 0 auto; border:none; border-radius:12px; padding:9px 14px; font-size:13px; font-weight:900; cursor:pointer;
+    background:linear-gradient(135deg,#4ade80,#16a34a); color:#06280f; box-shadow:0 4px 12px rgba(74,222,128,.3); }
+  .miss .claim:disabled { opacity:.4; cursor:default; background:rgba(255,255,255,.1); color:#86a07f; box-shadow:none; }
+
+  /* coleção */
+  .col-ti { font-size:12px; color:#ffd968; letter-spacing:2px; margin:4px 0 10px; font-weight:800; }
+  .colbar { width:min(320px,86vw); margin:0 auto 14px; background:rgba(255,255,255,.09); border-radius:999px; height:12px; overflow:hidden; }
+  .colbar i { display:block; height:100%; background:linear-gradient(90deg,#ffd968,#ff8a00); transition:width .4s; }
+  .catgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; width:min(340px,92vw); margin:0 auto; }
+  .catcard { border-radius:18px; padding:12px 8px; background:linear-gradient(160deg,rgba(255,255,255,.09),rgba(255,255,255,.03));
+    border:1px solid rgba(255,255,255,.12); box-shadow:0 8px 18px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.1); }
+  .catcard .ce { font-size:42px; }
+  .catcard .cn { font-size:13px; font-weight:800; margin:4px 0 2px; }
+  .catcard .cr { font-size:10px; letter-spacing:1px; text-transform:uppercase; font-weight:900; }
+  .catcard .cd { font-size:10px; color:#86a07f; min-height:26px; line-height:1.3; }
+  .catcard.lock { opacity:.4; filter:grayscale(.9); }
+  .catcard.lock .cn, .catcard.lock .cd { color:#86a07f; }
+  .catcard .cb { font-size:11px; color:#ffd968; font-weight:700; margin-top:2px; }
+  .cr-comum { color:#c3cdc3; } .cr-raro { color:#7dd3fc; } .cr-epico { color:#c084fc; } .cr-lendario { color:#ffd968; }
+  .catcard.r-comum .ce { filter:none; } .catcard.r-raro { border-color:rgba(125,211,252,.4); }
+  .catcard.r-epico { border-color:rgba(192,132,252,.5); box-shadow:0 8px 22px rgba(192,132,252,.25); }
+  .catcard.r-lendario { border-color:rgba(255,217,104,.6); box-shadow:0 8px 26px rgba(255,180,0,.3); }
+
   /* modal de saque */
   .modal { position:fixed; inset:0; z-index:60; display:flex; flex-direction:column; justify-content:center; align-items:center;
     background:rgba(6,12,7,.88); backdrop-filter:blur(6px); padding:20px; }
@@ -158,6 +191,7 @@
 <div class="tabs">
   <button class="tab on" id="tabSlot">🎰 Máquina</button>
   <button class="tab" id="tabVila">🏠 Vila</button>
+  <button class="tab" id="tabCol">🐾 Coleção</button>
 </div>
 
 <div class="panel" id="panelSlot">
@@ -170,7 +204,8 @@
     </div>
     <button class="spin-btn" id="btnSpin">🎰 Girar · <span id="custo">20</span> 🪙</button>
     <div class="msg" id="msg">Bem-vindo de volta! 🐾</div>
-    <div class="mini">2 ou 3 iguais pagam moedas. Trinca de 🐁 ataca vilas, 🛡️ protege e 🎁 abre saque!</div>
+    <div class="mini">2 ou 3 iguais pagam moedas. Trinca de 🐁 ataca vilas, 🛡️ protege e 🎁 abre saque. 🐾 coleta gatos pro teu bônus!</div>
+    <div class="mini" id="pity">🐾 Próximo gato: 0%</div>
   </div>
 </div>
 
@@ -183,6 +218,16 @@
   <div class="prog"><i id="vprog"></i></div>
   <button class="daily" id="btnDaily">🎁 Recompensa diária +<span id="drv">40</span> 🪙</button>
   <div class="blds" id="blds"></div>
+  <div class="mis-ti">🎯 MISSÕES DE HOJE</div>
+  <div id="missions"></div>
+</div>
+
+<div class="panel hidden" id="panelCol">
+  <div class="col-ti">🐾 COLEÇÃO DE GATOS</div>
+  <div class="colbar"><i id="colbar" style="width:0%"></i></div>
+  <div class="vsub" id="colCount">0/10 gatos</div>
+  <div class="vsub" id="colBonus"></div>
+  <div class="catgrid" id="catgrid"></div>
 </div>
 
 <div class="recent">
@@ -207,7 +252,7 @@
 
   const $ = id => document.getElementById(id);
   const fmt = n => Number(n).toLocaleString('pt-BR');
-  const SYMS = ['🐱','🐟','🧶','🥛','🐁','🛡️','🎁','❌'];
+  const SYMS = ['🐱','🐟','🧶','🥛','🐁','🛡️','🎁','🐾','❌'];
   let spinCost = 20, dailyReward = 40, village = null, order = [];
   let raidData = null;
 
@@ -250,8 +295,20 @@
           else if(d.kind==='pair'){ main='😺 Dupla '+d.e+'! +'+fmt(d.win)+' moedas'; msg(main,'bom'); celebrate(d.win); }
           else if(d.kind==='shield'){ main='🛡️ +'+d.guard+' escudo'+(d.guard>1?'s':'')+' de proteção!'; if(d.win>0){ main+=' +'+fmt(d.win)+' 🪙'; celebrate(d.win); } msg(main,'bom'); }
           else if(d.kind==='attack'){ main='🥷 O RATO atacou a Vila '+(d.attack?d.attack.target:'')+'! +'+fmt(d.win)+' 🪙'; msg(main,'bom'); celebrate(d.win); }
+          else if(d.kind==='cat'){
+            if(d.cat){
+              main = d.cat.nova
+                ? '🐾 NOVO GATO: '+d.cat.e+' '+d.cat.nome+' ('+d.cat.rarLabel+')!'
+                : '🐾 '+d.cat.e+' '+d.cat.nome+' repetido! +'+fmt(d.win)+' 🪙';
+              msg(main,'bom');
+              celebrate(d.cat.nova ? 60 : (d.win||50));
+              if(d.collection) toast('🎉 COLEÇÃO COMPLETA! Prêmio +'+fmt(d.collection.reward)+' 🪙');
+            } else { msg('🐾 Uma pegada! '+d.catPity+'% pra próxima pegadinha','foi'); }
+          }
           else if(d.kind==='raid'){ main='🎁 SAQUE! Escolhe um baú'; msg(main,'bom'); carregarVila(); abrirSaque(d.chests, d.raidExpirySec); }
           else msg('😿 Nada dessa vez! Tenta de novo','foi');
+          if(d.missions) renderMissions(d.missions);
+          $('pity').textContent='🐾 Próximo gato: '+d.catPity+'%';
           if(d.defense && d.defense.blocked) toast('🛡️ Teu escudo bloqueou um ataque!');
           else if(d.defense && d.defense.lost>0) toast('⚠️ Um gatuno levou '+fmt(d.defense.lost)+' moedas!');
           bloquear(false);
@@ -265,6 +322,51 @@
     return '<div class="chip"><span class="n">'+c.nick+'</span><span class="s">'+c.syms.join('')+'</span>'+v+'</div>';
   }).join(''); }
 
+  function renderMissions(list){
+    $('missions').innerHTML=(list||[]).map(m=>{
+      const pct=Math.min(100, m.target? m.current/m.target*100:0);
+      const btn= m.claimed
+        ? '<button class="claim" disabled>✓</button>'
+        : (m.done
+          ? '<button class="claim" data-m="'+m.id+'">Receber</button>'
+          : '<button class="claim" disabled>'+m.current+'/'+m.target+'</button>');
+      return '<div class="miss '+(m.done?'done':'')+'"><span class="mi">'+m.icon+'</span>'+
+        '<div class="mbody"><div class="mn">'+m.name+'</div>'+
+        '<div class="mp"><i style="width:'+pct+'%"></i></div></div>'+btn+'</div>';
+    }).join('');
+    [...document.querySelectorAll('#missions .claim[data-m]')].forEach(b=>b.onclick=()=>resgatarMissao(b.dataset.m));
+  }
+
+  function resgatarMissao(id){
+    post('/api/gato/mission-claim',{userId,id}).then(d=>{
+      if(d.error){ toast('❌ '+d.error); return; }
+      setCoins(d.balance);
+      if(d.missions) renderMissions(d.missions);
+      toast('🎯 Missão concluída! +'+fmt(d.reward)+' 🪙  (+'+d.xp+' XP)');
+      celebrate(d.reward);
+    }).catch(()=>toast('Sem internet'));
+  }
+
+  function renderColecao(){
+    fetch(API+'/api/gato/collection?userId='+userId).then(r=>r.json()).then(d=>{
+      if(d.error) return;
+      $('colbar').style.width=(d.owned/d.total*100)+'%';
+      $('colCount').textContent=d.owned+'/'+d.total+' gatos'+(d.complete?' — COLEÇÃO COMPLETA! 🎉':'');
+      const b=d.bonus||{};
+      $('colBonus').textContent='Bônus: +'+b.coins+'% moedas · +'+b.luck+'% sorte · +'+b.raid+'% saque';
+      $('catgrid').innerHTML=d.cats.map(c=>{
+        const b2=c.b||{};
+        return '<div class="catcard '+(c.owned?'':'lock')+' r-'+c.rar+'">'+
+          '<div class="ce">'+(c.owned?c.e:'❓')+'</div>'+
+          '<div class="cn">'+c.nome+'</div>'+
+          '<div class="cr cr-'+c.rar+'">'+c.rarLabel+'</div>'+
+          '<div class="cd">'+c.desc+'</div>'+
+          '<div class="cb">'+(b2.coins?'+'+b2.coins+'% moedas ':'')+(b2.raid?'+'+b2.raid+'% saque ':'')+(b2.luck?'+'+b2.luck+'% sorte':'')+'</div>'+
+          '</div>';
+      }).join('');
+    }).catch(()=>{});
+  }
+
   function renderVila(){
     if(!village) return;
     const v=village.village;
@@ -273,12 +375,14 @@
     $('vPos').textContent='Vila '+v.vid+' de '+v.totalVillages;
     $('vShields').textContent='🛡️ '+v.shields+'/'+v.maxShields+' escudos'+(v.shields>0?' (protegido)':'');
     $('vlvl').textContent=v.level;
+    $('pity').textContent='🐾 Próximo gato: '+Math.round(v.catPity||0)+'%';
     const epoch=v.pp-(v.level-1)*v.ppPerLevel;
     $('vprog').style.width=(v.ppPerLevel? epoch/v.ppPerLevel*100 : 0)+'%';
     $('btnDaily').disabled=!v.daily.available;
     $('btnDaily').innerHTML = v.daily.available
-      ? ('🎁 Recompensa diária +<span id="drv">'+v.daily.reward+'</span> 🪙')
-      : '✅ Diária resgatada! Volte amanhã';
+      ? ('<span>🎁 Diária dia '+v.daily.day+'/'+v.daily.streakMax+' · sequência '+v.daily.streak+'</span> +<span id="drv">'+v.daily.reward+'</span> 🪙')
+      : ('✅ Diária de hoje ok · sequência '+v.daily.streak+'/'+v.daily.streakMax);
+    renderMissions(v.missions||[]);
 
     const built=v.built||{};
     $('blds').innerHTML=(order||[]).map(b=>{
@@ -379,8 +483,14 @@
   $('btnSpin').onclick=girar;
   $('btnDaily').onclick=diaria;
   $('raidClose').onclick=fecharSaque;
-  $('tabSlot').onclick=()=>{ $('tabSlot').className='tab on'; $('tabVila').className='tab'; $('panelSlot').classList.remove('hidden'); $('panelVila').classList.add('hidden'); };
-  $('tabVila').onclick=()=>{ $('tabVila').className='tab on'; $('tabSlot').className='tab'; $('panelVila').classList.remove('hidden'); $('panelSlot').classList.add('hidden'); carregarVila(); };
+  function tab(id, on){
+    ['tabSlot','tabVila','tabCol'].forEach(t=>$(t).className='tab'+(t===id?' on':''));
+    ['panelSlot','panelVila','panelCol'].forEach(p=>$(p).classList.add('hidden'));
+    $(on).classList.remove('hidden');
+  }
+  $('tabSlot').onclick=()=>tab('tabSlot','panelSlot');
+  $('tabVila').onclick=()=>{ tab('tabVila','panelVila'); carregarVila(); };
+  $('tabCol').onclick=()=>{ tab('tabCol','panelCol'); renderColecao(); };
 
   fetch(API+'/api/balance/'+userId).then(r=>r.json()).then(d=>setCoins(d.balance)).catch(()=>{});
   status(); setInterval(status,5000);
