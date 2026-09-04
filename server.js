@@ -505,6 +505,19 @@ app.post('/api/gato/spin', async (req, res) => {
   }
 });
 
+app.post('/api/gato/raid', async (req, res) => {
+  try {
+    const { userId, pick } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
+    const r = await gato.raid(db, userId, pick);
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    console.error('Erro no saque do gato:', err.message);
+    res.status(500).json({ error: 'Erro no saque' });
+  }
+});
+
 app.post('/api/gato/build', async (req, res) => {
   try {
     const { userId } = req.body;

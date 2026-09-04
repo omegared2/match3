@@ -130,6 +130,23 @@
     background:rgba(10,16,10,.94); border:1px solid rgba(255,255,255,.18); border-radius:16px; padding:12px 20px; font-size:14px; font-weight:800;
     box-shadow:0 12px 30px rgba(0,0,0,.5); opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; }
   .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* modal de saque */
+  .modal { position:fixed; inset:0; z-index:60; display:flex; flex-direction:column; justify-content:center; align-items:center;
+    background:rgba(6,12,7,.88); backdrop-filter:blur(6px); padding:20px; }
+  .modal.hidden { display:none; }
+  .modal h2 { font-size:24px; margin-bottom:6px; text-shadow:0 0 20px rgba(255,215,0,.6); }
+  .modal p { color:#b7d3b0; font-size:14px; margin-bottom:18px; }
+  .chests { display:flex; gap:14px; margin-bottom:20px; }
+  .chest { width:88px; height:96px; border-radius:20px; font-size:46px; display:flex; justify-content:center; align-items:center; cursor:pointer;
+    background:linear-gradient(160deg,rgba(255,255,255,.12),rgba(255,255,255,.04));
+    border:2px solid rgba(255,215,0,.55);
+    box-shadow:0 10px 26px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.15);
+    transition:transform .12s; }
+  .chest:active { transform:scale(.9); }
+  .chest.aberto { border-color:rgba(255,255,255,.15); cursor:default; }
+  .fechar { border:none; border-radius:14px; padding:11px 26px; font-size:14px; font-weight:800; cursor:pointer;
+    background:rgba(255,255,255,.1); color:#dfeccf; border:1px solid rgba(255,255,255,.14); }
 </style>
 </head>
 <body>
@@ -153,7 +170,7 @@
     </div>
     <button class="spin-btn" id="btnSpin">🎰 Girar · <span id="custo">20</span> 🪙</button>
     <div class="msg" id="msg">Bem-vindo de volta! 🐾</div>
-    <div class="mini">O Gatinho gira! 2 ou 3 iguais pagam moedas. Ganhe moedas pra evoluir sua Vila.</div>
+    <div class="mini">2 ou 3 iguais pagam moedas. Trinca de 🐁 ataca vilas, 🛡️ protege e 🎁 abre saque!</div>
   </div>
 </div>
 
@@ -161,6 +178,7 @@
   <div class="world"><span id="wEmoji">🌱</span> <span id="wName">Mundo Inicial</span></div>
   <div class="vtitle" id="vName">Vila do Gato</div>
   <div class="vsub" id="vPos">Vila 1 de 2000</div>
+  <div class="vsub" id="vShields">🛡️ 0/5 escudos</div>
   <div class="vlvl">🏘️ Nível <b id="vlvl">1</b> · Progresso</div>
   <div class="prog"><i id="vprog"></i></div>
   <button class="daily" id="btnDaily">🎁 Recompensa diária +<span id="drv">40</span> 🪙</button>
@@ -172,6 +190,14 @@
   <div class="chips" id="recent"></div>
 </div>
 
+<!-- modal de saque (3 baús; o servidor já decidiu o prêmio no spin) -->
+<div class="modal hidden" id="raidModal">
+  <h2>🎁 Um saque apareceu!</h2>
+  <p>Escolha um baú</p>
+  <div class="chests" id="chests"></div>
+  <button class="fechar" id="raidClose">Fechar</button>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -181,8 +207,9 @@
 
   const $ = id => document.getElementById(id);
   const fmt = n => Number(n).toLocaleString('pt-BR');
-  const SYMS = ['🐱','🐟','🧶','🥛','🐁','💤','❌'];
+  const SYMS = ['🐱','🐟','🧶','🥛','🐁','🛡️','🎁','❌'];
   let spinCost = 20, dailyReward = 40, village = null, order = [];
+  let raidData = null;
 
   function toast(t){ const el=$('toast'); el.textContent=t; el.classList.add('show'); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),2200); }
   function msg(txt, cls){ const el=$('msg'); el.textContent=txt; el.className='msg '+(cls||''); }
@@ -218,9 +245,15 @@
           clearInterval(anim);
           r0.textContent=d.syms[0]; r1.textContent=d.syms[1]; r2.textContent=d.syms[2];
           setCoins(d.balance);
-          if(d.kind==='all'){ msg('🎉 TRIPLO '+d.e+'! +'+fmt(d.win)+' moedas!','bom'); celebrate(d.win); }
-          else if(d.kind==='pair'){ msg('😺 Dupla '+d.e+'! +'+fmt(d.win)+' moedas','bom'); celebrate(d.win); }
+          let main = '';
+          if(d.kind==='all'){ main='🎉 TRIPLO '+d.e+'! +'+fmt(d.win)+' moedas!'; msg(main,'bom'); celebrate(d.win); }
+          else if(d.kind==='pair'){ main='😺 Dupla '+d.e+'! +'+fmt(d.win)+' moedas'; msg(main,'bom'); celebrate(d.win); }
+          else if(d.kind==='shield'){ main='🛡️ +'+d.guard+' escudo'+(d.guard>1?'s':'')+' de proteção!'; if(d.win>0){ main+=' +'+fmt(d.win)+' 🪙'; celebrate(d.win); } msg(main,'bom'); }
+          else if(d.kind==='attack'){ main='🥷 O RATO atacou a Vila '+(d.attack?d.attack.target:'')+'! +'+fmt(d.win)+' 🪙'; msg(main,'bom'); celebrate(d.win); }
+          else if(d.kind==='raid'){ main='🎁 SAQUE! Escolhe um baú'; msg(main,'bom'); carregarVila(); abrirSaque(d.chests, d.raidExpirySec); }
           else msg('😿 Nada dessa vez! Tenta de novo','foi');
+          if(d.defense && d.defense.blocked) toast('🛡️ Teu escudo bloqueou um ataque!');
+          else if(d.defense && d.defense.lost>0) toast('⚠️ Um gatuno levou '+fmt(d.defense.lost)+' moedas!');
           bloquear(false);
           renderRecent(d.recent||[]);
         }, 420);
@@ -238,6 +271,7 @@
     $('wEmoji').textContent=v.worldEmoji; $('wName').textContent=v.world;
     $('vName').textContent=v.name;
     $('vPos').textContent='Vila '+v.vid+' de '+v.totalVillages;
+    $('vShields').textContent='🛡️ '+v.shields+'/'+v.maxShields+' escudos'+(v.shields>0?' (protegido)':'');
     $('vlvl').textContent=v.level;
     const epoch=v.pp-(v.level-1)*v.ppPerLevel;
     $('vprog').style.width=(v.ppPerLevel? epoch/v.ppPerLevel*100 : 0)+'%';
@@ -275,6 +309,30 @@
       if(v.next){ bb.textContent='🔨 Construir '+v.next.e+' '+v.next.nome+' · Nv '+v.next.tier+'/5 · 💰 '+fmt(v.next.custo); }
       else{ bb.style.display='none'; }
     }
+  }
+
+  function abrirSaque(chests, expirySec){
+    raidData = { expiry: expirySec || 120 };
+    const el=$('raidModal');
+    el.classList.remove('hidden');
+    $('chests').innerHTML = [0,1,2].map(i=>'<div class="chest" data-i="'+i+'">🎁</div>').join('');
+    [...$('chests').children].forEach(c=>c.onclick=()=>escolherBaú(Number(c.dataset.i)));
+  }
+  function fecharSaque(){ $('raidModal').classList.add('hidden'); raidData=null; }
+
+  function escolherBaú(pick){
+    const chests=[...$('chests').children];
+    chests.forEach(c=>{ c.classList.add('aberto'); c.onclick=null; });
+    chests[pick].textContent='⏳';
+    post('/api/gato/raid',{userId,pick}).then(d=>{
+      if(d.error){ toast('❌ '+d.error); chests[pick].textContent='🎁'; chests.forEach(c=>{c.classList.remove('aberto');}); return; }
+      chests.forEach(c=>{ c.textContent='🕸️'; });
+      chests[pick].textContent='💰 '+fmt(d.prize);
+      setCoins(d.balance);
+      celebrate(d.prize);
+      toast('🎁 +'+fmt(d.prize)+' moedas!');
+      carregarVila();
+    }).catch(()=>{ toast('Sem internet'); chests[pick].textContent='🎁'; });
   }
 
   function construir(){
@@ -320,6 +378,7 @@
 
   $('btnSpin').onclick=girar;
   $('btnDaily').onclick=diaria;
+  $('raidClose').onclick=fecharSaque;
   $('tabSlot').onclick=()=>{ $('tabSlot').className='tab on'; $('tabVila').className='tab'; $('panelSlot').classList.remove('hidden'); $('panelVila').classList.add('hidden'); };
   $('tabVila').onclick=()=>{ $('tabVila').className='tab on'; $('tabSlot').className='tab'; $('panelVila').classList.remove('hidden'); $('panelSlot').classList.add('hidden'); carregarVila(); };
 
