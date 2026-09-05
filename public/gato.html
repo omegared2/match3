@@ -231,6 +231,8 @@
   .fechar { border:none; border-radius:14px; padding:11px 26px; font-size:14px; font-weight:800; cursor:pointer;
     background:rgba(255,255,255,.1); color:#dfeccf; border:1px solid rgba(255,255,255,.14); }
 </style>
+<link rel="stylesheet" href="gato-brand.css">
+  <script src="gato-brand.js"></script>
 </head>
 <body>
 <header>
@@ -375,6 +377,7 @@
   window.addEventListener('online',()=>{ mudaNet(true); carregarVila(); status(); });
 
   function celebrate(n){
+    __snd&&__snd('win');
     for(let i=0;i<14;i++){
       const p=document.createElement('div'); p.className='p';
       p.textContent=['🪙','✨','⭐','🐾'][i%4];
@@ -393,6 +396,7 @@
   function girar(){
     if(!online){ msg('🔌 Sem conexão — tenta de novo','foi'); return; }
     bloquear(true); msg('🎰 Girando...');
+    __snd&&__snd('spin');
     const r0=$('r0'),r1=$('r1'),r2=$('r2');
     const anim = setInterval(()=>{ r0.textContent=SYMS[Math.random()*SYMS.length|0]; r1.textContent=SYMS[Math.random()*SYMS.length|0]; r2.textContent=SYMS[Math.random()*SYMS.length|0]; },70);
     post('/api/gato/spin',{userId,nick:userId})
@@ -409,6 +413,7 @@
           else if(d.kind==='attack'){ main='🥷 O RATO atacou a Vila '+(d.attack?d.attack.target:'')+'! +'+fmt(d.win)+' 🪙'; msg(main,'bom'); celebrate(d.win); }
           else if(d.kind==='cat'){
             if(d.cat){
+              if(d.cat.nova) __snd&&__snd('cat');
               main = d.cat.nova
                 ? '🐾 NOVO GATO: '+d.cat.e+' '+d.cat.nome+' ('+d.cat.rarLabel+')!'
                 : '🐾 '+d.cat.e+' '+d.cat.nome+' repetido! +'+fmt(d.win)+' 🪙';
@@ -426,7 +431,7 @@
           bloquear(false);
           renderRecent(d.recent||[]);
         }, 420);
-      }).catch(()=>{ clearInterval(anim); bloquear(false); msg('Sem internet, tenta de novo','foi'); });
+      }).catch(()=>{ clearInterval(anim); bloquear(false); msg('Sem internet, tenta de novo','foi'); __snd&&__snd('err'); });
   }
 
   function renderRecent(list){ $('recent').innerHTML=(list||[]).map(c=>{
@@ -456,6 +461,7 @@
       setCoins(d.balance);
       if(d.missions) renderMissions(d.missions);
       toast('🎯 Missão concluída! +'+fmt(d.reward)+' 🪙  (+'+d.xp+' XP)');
+      __snd&&__snd('coin');
       celebrate(d.reward);
     }).catch(()=>toast('Sem internet'));
   }
@@ -570,6 +576,7 @@
     post('/api/gato/build',{userId}).then(d=>{
       if(d.error){ toast('❌ '+d.error); return; }
       setCoins(d.balance); village=d; toast('🏠 '+d.building.e+' '+d.building.nome+' → Nv '+d.building.tier+'!');
+      __snd&&__snd('build');
       renderVila();
     }).catch(()=>toast('Sem internet'));
   }
@@ -579,6 +586,7 @@
     post('/api/gato/advance',{userId}).then(d=>{
       if(d.error){ toast('❌ '+d.error); return; }
       setCoins(d.balance); village=d;
+      __snd&&__snd('cat');
       celebrate(d.reward);
       toast('🚀 '+d.to.worldEmoji+' Nova vila: '+d.to.name+'  +'+fmt(d.reward)+' 🪙');
       renderVila();
@@ -604,7 +612,7 @@
     if(!online) return semNet();
     post('/api/gato/daily',{userId}).then(d=>{
       if(d.error){ toast('❌ '+d.error); return; }
-      setCoins(d.balance); toast('🎁 +'+fmt(d.reward)+' moedas resgatadas!'); celebrate(d.reward);
+      setCoins(d.balance); toast('🎁 +'+fmt(d.reward)+' moedas resgatadas!'); __snd&&__snd('coin'); celebrate(d.reward);
       carregarVila();
     }).catch(()=>toast('Sem internet'));
   }

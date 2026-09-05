@@ -70,6 +70,8 @@
   .small { font-size:18px; color:#86a07f; padding-top:6px; }
   .hidden { display:none !important; }
 </style>
+<link rel="stylesheet" href="gato-brand.css">
+  <script src="gato-brand.js"></script>
 </head>
 <body>
 <header>
@@ -139,7 +141,7 @@ function animar(r0,r1,r2){
 }
 
 function girarTV(){
-  $('btnSpin').disabled=true; msg('🎰 Girando...');
+  $('btnSpin').disabled=true; msg('🎰 Girando...'); __snd&&__snd('spin');
   const r0=$('r0'),r1=$('r1'),r2=$('r2');
   const t=animar(r0,r1,r2);
   post('/api/gato/spin',{userId,nick:userId}).then(d=>{
@@ -148,10 +150,10 @@ function girarTV(){
       clearInterval(t);
       r0.textContent=d.syms[0]; r1.textContent=d.syms[1]; r2.textContent=d.syms[2];
       $('coins').textContent=fmt(d.balance||0);
-      if(d.kind==='all'||d.kind==='pair') msg(`🎉 ${d.syms.join('')} +${fmt(d.win)} 🪙`,'bom');
-      else if(d.kind==='shield') msg(`🛡️ Escudos: +${d.guard}`,'bom');
-      else if(d.kind==='attack') msg(`🥷 Ataque! +${fmt(d.win)} 🪙`,'bom');
-      else if(d.kind==='cat') msg(d.cat ? (d.cat.nova?`🐾 NOVO GATO ${d.cat.e} ${d.cat.nome}!`:`🐾 ${d.cat.nome} repetido +${fmt(d.win)}🪙`) : `🐾 Pegada... ${d.catPity}%`,'bom');
+      if(d.kind==='all'||d.kind==='pair'){ __snd&&__snd('win'); msg(`🎉 ${d.syms.join('')} +${fmt(d.win)} 🪙`,'bom'); }
+      else if(d.kind==='shield'){ if(d.win>0) __snd&&__snd('win'); msg(`🛡️ Escudos: +${d.guard}`,'bom'); }
+      else if(d.kind==='attack'){ __snd&&__snd('win'); msg(`🥷 Ataque! +${fmt(d.win)} 🪙`,'bom'); }
+      else if(d.kind==='cat'){ if(d.cat && d.cat.nova) __snd&&__snd('cat'); else __snd&&__snd('win'); msg(d.cat ? (d.cat.nova?`🐾 NOVO GATO ${d.cat.e} ${d.cat.nome}!`:`🐾 ${d.cat.nome} repetido +${fmt(d.win)}🪙`) : `🐾 Pegada... ${d.catPity}%`,'bom'); }
       else if(d.kind==='raid') msg('🎁 Abre saque no celular!','bom');
       else msg('😿 Tenta de novo','foi');
       $('pityTV').textContent='🐾 Próximo gato: '+(d.catPity??0)+'%';
@@ -194,7 +196,7 @@ function diariaTV(){
   post('/api/gato/daily',{userId}).then(d=>{
     if(d.error) return $('msg').textContent='❌ '+d.error;
     $('coins').textContent=fmt(d.balance);
-    msg('🎁 +'+fmt(d.reward)+' moedas! Sequência '+d.streak+'/'+d.streakMax,'bom');
+    msg('🎁 +'+fmt(d.reward)+' moedas! Sequência '+d.streak+'/'+d.streakMax,'bom'); __snd&&__snd('coin');
     carregaVilaTV();
   }).catch(()=>msg('Sem internet','foi'));
 }
