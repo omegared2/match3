@@ -75,18 +75,18 @@
     opts = opts || {};
     postAdEvent('recompensado');
     // modo real: unidade nativa ainda não configurada — rende via overlay/timer
-    var amount = (opts.coins || opts.amount) || 5;
+    var amount = (opts.coins || opts.amount) || 0;
     function finish() { if (opts.onComplete) opts.onComplete(); }
     if (!ACTIVE) {
       var i = setTimeout(function () {
         if (opts.onStart) { /* não re-cancela após iniciado */ }
-        grantCoins(amount, finish);
+        grantCoins(opts, function (bal) { if (opts.onComplete) opts.onComplete(bal); });
       }, 2000);
       if (opts.onStart) opts.onStart(function cancel() { clearTimeout(i); });
       return;
     }
     loadRealScript(function () {
-      grantCoins(amount, finish);
+      grantCoins(opts, function (bal) { if (opts.onComplete) opts.onComplete(bal); });
     });
   }
 
@@ -128,13 +128,16 @@
       }).catch(function () {});
     } catch (e) {}
   }
-  function grantCoins(amount, cb) {
+  function grantCoins(opts, cb) {
+    // Endpoint protegido (seção 47): o servidor decide o valor, cooldown e teto diário.
+    var reward = opts.coins || opts.amount || 0;
     try {
-      fetch(API + '/api/add', {
+      fetch(API + '/api/gato/ad-reward', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: USER_ID, amount: Number(amount) || 5 })
+        body: JSON.stringify({ userId: USER_ID })
       }).then(function (r) { return r.json(); }).then(function (d) {
-        if (cb) cb(d.balance);
+        if (d && d.ok) reward = d.reward;
+        if (cb) cb(d && d.ok ? d.balance : null, d && d.retryIn);
       }).catch(function () { if (cb) cb(null); });
     } catch (e) {
       if (cb) cb(null);

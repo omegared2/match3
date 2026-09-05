@@ -149,7 +149,7 @@
   atualizaSaldo();
   function verAnuncio(){
     if(!window.Ads){ alert('Anúncios indisponíveis no momento.'); return; }
-    Ads.showRewarded({ coins: 5, onComplete: function(){ atualizaSaldo(); alert('+5 moedas!'); } });
+    Ads.showRewarded({ onComplete: function(bal){ atualizaSaldo(); if(bal!=null) alert('Anúncio assistido! Moedas creditadas 🪙'); else alert('Tente novamente em alguns instantes.'); } });
   }
   if (window.Ads) Ads.showBanner('ad-banner');
   function compartilhar(){

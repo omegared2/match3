@@ -15,6 +15,7 @@ const turbo = require('./turbo');
 const gato = require('./gato');
 const wscl = require('./wscl');
 const criador = require('./criador');
+const limit = require('./limiter');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -38,6 +39,46 @@ async function notifyTelegram(text) {
 function packLabel(packId) {
   const pp = PACKS.find(p => p.id === packId);
   return pp ? `R$ ${pp.brl.toFixed(2).replace('.', ',')} (${pp.coins} moedas)` : packId || '';
+}
+
+// ---- Proteção contra manipulação (seção 47) ----
+
+// Lock por usuário: serializa mutações para impedir recompensa duplicada em paralelo.
+const locks = new Map();
+function runExclusive(userId, fn) {
+  const prev = locks.get(userId) || Promise.resolve();
+  const run = prev.catch(() => {}).then(fn);
+  locks.set(userId, run.then(() => {}, () => {}));
+  return run;
+}
+
+// Normaliza e valida userId (rejeita valores inválidos no cliente).
+const UID_RE = /^[A-Za-z0-9._-]{1,40}$/;
+function uid(v) {
+  if (typeof v !== 'string') return null;
+  const s = v.trim();
+  return UID_RE.test(s) ? s : null;
+}
+
+// Sanitiza nick (sem caracteres de controle, máx 24).
+function nickSan(v) {
+  return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 24);
+}
+
+// IP real (atrás de proxy).
+function ipReq(req) {
+  return String((req.headers['x-forwarded-for'] || '').split(',')[0] || req.socket.remoteAddress || '?').trim();
+}
+
+const APP_SECRET = process.env.GT_APP_SECRET || null;
+
+// Limite por IP nos endpoints sensíveis.
+function limitaIp(max, windowMs) {
+  return (req, res, next) => {
+    const b = limit.rate('ip:' + ipReq(req), max, windowMs);
+    if (!b.ok) return res.status(429).json({ error: 'Muitas requisições — aguarde um pouco', retryAfter: b.retryAfter });
+    next();
+  };
 }
 
 // Se for compra do Criador de Vídeos, libera o usuário em vez de dar moedas
@@ -84,7 +125,7 @@ function adNotifyMilestone() {
     );
   }
 }
-app.post('/api/ad-event', express.json(), (req, res) => {
+app.post('/api/ad-event', express.json(), limitaIp(60, 30000), (req, res) => {
   const { type, valueMicros, currencyCode, networkName } = req.body || {};
   const t = ['banner', 'interstitial', 'recompensado'].includes(type) ? type : 'outros';
   const value = Number(valueMicros) || 0;
@@ -282,7 +323,13 @@ app.get('/api/balance/:userId', async (req, res) => {
 // -------------------------------------------------------
 app.post('/api/spend', async (req, res) => {
   try {
-    const { userId, cost } = req.body;
+    const userId = uid(req.body && req.body.userId);
+    const cost = req.body && req.body.cost;
+    if (!userId) return res.status(400).json({ error: 'userId inválido' });
+    if (typeof cost !== 'number' || !Number.isSafeInteger(cost) || cost <= 0 || cost > 1000000) return res.status(400).json({ error: 'valor inválido' });
+    if (APP_SECRET && req.headers['x-app-secret'] !== APP_SECRET) return res.status(403).json({ error: 'acesso negado' });
+    const lb = limit.rate('sp:' + userId, 10, 10000);
+    if (!lb.ok) return res.status(429).json({ error: 'Muito rápido — aguarde um pouco', retryAfter: lb.retryAfter });
     const r = await db.dbSpendCoins(userId, cost);
     if (!r) return res.status(400).json({ error: 'Moedas insuficientes' });
     res.json({ balance: r.balance });
@@ -294,10 +341,22 @@ app.post('/api/spend', async (req, res) => {
 // -------------------------------------------------------
 // 5c) Adicionar moedas (ganhas jogando)
 //    POST /api/add  { userId, amount }
+//    Com GT_APP_SECRET configurado, exige o header x-app-secret
+//    (consumidor legítimo = semente pix/plataforma). Sem segredo,
+//    fica limitado por valor e teto diário. O jogo Gatinho NÃO usa
+//    este endpoint: ganhos de anúncio vêm de /api/gato/ad-reward.
 // -------------------------------------------------------
-app.post('/api/add', async (req, res) => {
+app.post('/api/add', limitaIp(120, 10000), async (req, res) => {
   try {
-    const { userId, amount } = req.body;
+    const userId = uid(req.body && req.body.userId);
+    const amount = req.body && req.body.amount;
+    if (!userId) return res.status(400).json({ error: 'userId inválido' });
+    if (typeof amount !== 'number' || !Number.isSafeInteger(amount) || amount <= 0 || amount > 1000000) return res.status(400).json({ error: 'valor inválido' });
+    if (APP_SECRET && req.headers['x-app-secret'] !== APP_SECRET) return res.status(403).json({ error: 'acesso negado' });
+    const lb = limit.rate('ad:' + userId, 20, 10000);
+    if (!lb.ok) return res.status(429).json({ error: 'Muito rápido — aguarde um pouco', retryAfter: lb.retryAfter });
+    const cap = limit.acc('addtotal:' + userId, amount, 200000, 86400000);
+    if (!cap.ok) return res.status(429).json({ error: 'Limite diário excedido' });
     const r = await db.dbAddCoins(userId, amount);
     res.json({ balance: r.balance });
   } catch (err) {
@@ -488,6 +547,7 @@ function pushSinc(userId) {
 }
 
 app.get('/api/gato/status', (req, res) => res.json(gato.status()));
+app.use('/api/gato', limitaIp(150, 15000));
 
 app.get('/api/gato/ranking', async (req, res) => {
   try {
@@ -513,9 +573,13 @@ app.get('/api/gato/amigos', async (req, res) => {
 
 app.post('/api/gato/amigos/add', async (req, res) => {
   try {
-    const { userId, codigo } = req.body;
-    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
-    const r = await gato.amigoAdd(db, userId, codigo);
+    const me = uid(req.body && req.body.userId);
+    const alvo = uid(req.body && req.body.codigo);
+    if (!me) return res.status(400).json({ error: 'userId inválido' });
+    if (!alvo) return res.status(400).json({ error: 'código inválido' });
+    const lb = limit.rate('u:' + me, 30, 15000);
+    if (!lb.ok) return res.status(429).json({ error: 'Muito rápido — aguarde um pouco', retryAfter: lb.retryAfter });
+    const r = await runExclusive(me, () => gato.amigoAdd(db, me, alvo));
     if (r.error) return res.status(400).json({ error: r.error });
     res.json(r);
   } catch (err) {
@@ -526,9 +590,13 @@ app.post('/api/gato/amigos/add', async (req, res) => {
 
 app.post('/api/gato/amigos/remove', async (req, res) => {
   try {
-    const { userId, codigo } = req.body;
-    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
-    const r = await gato.amigoRemove(db, userId, codigo);
+    const me = uid(req.body && req.body.userId);
+    const alvo = uid(req.body && req.body.codigo);
+    if (!me) return res.status(400).json({ error: 'userId inválido' });
+    if (!alvo) return res.status(400).json({ error: 'código inválido' });
+    const lb = limit.rate('u:' + me, 30, 15000);
+    if (!lb.ok) return res.status(429).json({ error: 'Muito rápido — aguarde um pouco', retryAfter: lb.retryAfter });
+    const r = await runExclusive(me, () => gato.amigoRemove(db, me, alvo));
     if (r.error) return res.status(400).json({ error: r.error });
     res.json(r);
   } catch (err) {
@@ -539,11 +607,15 @@ app.post('/api/gato/amigos/remove', async (req, res) => {
 
 app.post('/api/gato/presente', async (req, res) => {
   try {
-    const { userId, codigo } = req.body;
-    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
-    const r = await gato.presente(db, userId, codigo);
+    const me = uid(req.body && req.body.userId);
+    const alvo = uid(req.body && req.body.codigo);
+    if (!me) return res.status(400).json({ error: 'userId inválido' });
+    if (!alvo) return res.status(400).json({ error: 'código inválido' });
+    const lb = limit.rate('u:' + me, 30, 15000);
+    if (!lb.ok) return res.status(429).json({ error: 'Muito rápido — aguarde um pouco', retryAfter: lb.retryAfter });
+    const r = await runExclusive(me, () => gato.presente(db, me, alvo));
     if (r.error) return res.status(400).json({ error: r.error });
-    pushSinc(userId);
+    pushSinc(me);
     res.json(r);
   } catch (err) {
     console.error('Erro no presente do gato:', err.message);
@@ -586,9 +658,13 @@ app.get('/api/gato/collection', async (req, res) => {
 
 app.post('/api/gato/mission-claim', async (req, res) => {
   try {
-    const { userId, id } = req.body;
-    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
-    const r = await gato.missionClaim(db, userId, id);
+    const userId = uid(req.body && req.body.userId);
+    const id = String((req.body && req.body.id) || '');
+    if (!userId) return res.status(400).json({ error: 'userId inválido' });
+    if (!/^[A-Za-z0-9_-]{1,20}$/.test(id)) return res.status(400).json({ error: 'missão inválida' });
+    const lb = limit.rate('u:' + userId, 30, 15000);
+    if (!lb.ok) return res.status(429).json({ error: 'Muito rápido — aguarde um pouco', retryAfter: lb.retryAfter });
+    const r = await runExclusive(userId, () => gato.missionClaim(db, userId, id));
     if (r.error) return res.status(400).json({ error: r.error });
     pushSinc(userId);
     res.json(r);
@@ -611,9 +687,12 @@ app.get('/api/gato/village', async (req, res) => {
 
 app.post('/api/gato/spin', async (req, res) => {
   try {
-    const { userId, nick } = req.body;
-    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
-    const r = await gato.spin(db, userId, nick);
+    const userId = uid(req.body && req.body.userId);
+    if (!userId) return res.status(400).json({ error: 'userId inválido' });
+    const nick = nickSan(req.body && req.body.nick);
+    const lb = limit.rate('u:' + userId, 30, 15000);
+    if (!lb.ok) return res.status(429).json({ error: 'Muito rápido — aguarde um pouco', retryAfter: lb.retryAfter });
+    const r = await runExclusive(userId, () => gato.spin(db, userId, nick));
     if (r.error) return res.status(400).json({ error: r.error });
     pushSinc(userId);
     res.json(r);
@@ -625,9 +704,13 @@ app.post('/api/gato/spin', async (req, res) => {
 
 app.post('/api/gato/raid', async (req, res) => {
   try {
-    const { userId, pick } = req.body;
-    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
-    const r = await gato.raid(db, userId, pick);
+    const userId = uid(req.body && req.body.userId);
+    const pick = req.body && req.body.pick;
+    if (!userId) return res.status(400).json({ error: 'userId inválido' });
+    if (![0, 1, 2].includes(pick)) return res.status(400).json({ error: 'Escolha inválida' });
+    const lb = limit.rate('u:' + userId, 30, 15000);
+    if (!lb.ok) return res.status(429).json({ error: 'Muito rápido — aguarde um pouco', retryAfter: lb.retryAfter });
+    const r = await runExclusive(userId, () => gato.raid(db, userId, pick));
     if (r.error) return res.status(400).json({ error: r.error });
     pushSinc(userId);
     res.json(r);
@@ -639,9 +722,11 @@ app.post('/api/gato/raid', async (req, res) => {
 
 app.post('/api/gato/build', async (req, res) => {
   try {
-    const { userId } = req.body;
-    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
-    const r = await gato.build(db, userId);
+    const userId = uid(req.body && req.body.userId);
+    if (!userId) return res.status(400).json({ error: 'userId inválido' });
+    const lb = limit.rate('u:' + userId, 30, 15000);
+    if (!lb.ok) return res.status(429).json({ error: 'Muito rápido — aguarde um pouco', retryAfter: lb.retryAfter });
+    const r = await runExclusive(userId, () => gato.build(db, userId));
     if (r.error) return res.status(400).json({ error: r.error });
     pushSinc(userId);
     res.json(r);
@@ -653,9 +738,11 @@ app.post('/api/gato/build', async (req, res) => {
 
 app.post('/api/gato/advance', async (req, res) => {
   try {
-    const { userId } = req.body;
-    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
-    const r = await gato.advance(db, userId);
+    const userId = uid(req.body && req.body.userId);
+    if (!userId) return res.status(400).json({ error: 'userId inválido' });
+    const lb = limit.rate('u:' + userId, 30, 15000);
+    if (!lb.ok) return res.status(429).json({ error: 'Muito rápido — aguarde um pouco', retryAfter: lb.retryAfter });
+    const r = await runExclusive(userId, () => gato.advance(db, userId));
     if (r.error) return res.status(400).json({ error: r.error });
     pushSinc(userId);
     res.json(r);
@@ -667,15 +754,33 @@ app.post('/api/gato/advance', async (req, res) => {
 
 app.post('/api/gato/daily', async (req, res) => {
   try {
-    const { userId } = req.body;
-    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
-    const r = await gato.daily(db, userId);
+    const userId = uid(req.body && req.body.userId);
+    if (!userId) return res.status(400).json({ error: 'userId inválido' });
+    const lb = limit.rate('u:' + userId, 30, 15000);
+    if (!lb.ok) return res.status(429).json({ error: 'Muito rápido — aguarde um pouco', retryAfter: lb.retryAfter });
+    const r = await runExclusive(userId, () => gato.daily(db, userId));
     if (r.error) return res.status(400).json({ error: r.error });
     pushSinc(userId);
     res.json(r);
   } catch (err) {
     console.error('Erro na diária do gato:', err.message);
     res.status(500).json({ error: 'Erro na diária' });
+  }
+});
+
+app.post('/api/gato/ad-reward', async (req, res) => {
+  try {
+    const userId = uid(req.body && req.body.userId);
+    if (!userId) return res.status(400).json({ error: 'userId inválido' });
+    const lb = limit.rate('u:' + userId, 10, 15000);
+    if (!lb.ok) return res.status(429).json({ error: 'Muito rápido — aguarde um pouco', retryAfter: lb.retryAfter });
+    const r = await runExclusive(userId, () => gato.adReward(db, userId));
+    if (r.error) return res.status(r.retryIn ? 429 : 400).json({ error: r.error, retryIn: r.retryIn || 0 });
+    pushSinc(userId);
+    res.json(r);
+  } catch (err) {
+    console.error('Erro no anúncio do gato:', err.message);
+    res.status(500).json({ error: 'Erro no anúncio' });
   }
 });
 

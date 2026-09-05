@@ -610,6 +610,36 @@ async function missionClaim(db, userId, id) {
 
 const GIFT_COST = Number(process.env.GT_GIFT_COST) || 50;
 
+// Anúncio recompensado (seção 47): o servidor decide valor, cooldown e teto diário.
+// O cliente nunca informa o montante — impede "manipular anúncios".
+CFG.adReward = Number(process.env.GT_AD_REWARD) || 50;
+CFG.adCooldownSec = Number(process.env.GT_AD_COOLDOWN) || 30;
+CFG.adDailyCap = Number(process.env.GT_AD_DAILY_CAP) || 40;
+
+async function adReward(db, userId) {
+  if (!userId) return { error: 'userId obrigatório' };
+  const char = await db.dbGetCharacter(userId);
+  const v = { ...defaultVillage(), ...((char && char.village) || {}) };
+  const now = Date.now();
+  const meta = v.ads || {};
+  const wait = Math.ceil(((meta.last || 0) + CFG.adCooldownSec * 1000 - now) / 1000);
+  if (wait > 0) return { error: 'Anúncio já contabilizado — aguarde', retryIn: wait, cooldownSec: wait };
+  const today = todayStr();
+  const count = meta.today === today ? (meta.count || 0) : 0;
+  if (count >= CFG.adDailyCap) return { error: 'Limite de anúncios do dia atingido' };
+  v.ads = { last: now, today, count: count + 1 };
+  const credited = await db.dbAddCoins(userId, CFG.adReward);
+  await db.dbSetCharacter(userId, { ...(char || {}), village: v });
+  stats.ads = (stats.ads || 0) + 1;
+  return {
+    ok: true,
+    reward: CFG.adReward,
+    balance: credited.balance,
+    cooldownSec: CFG.adCooldownSec,
+    leftToday: CFG.adDailyCap - (count + 1)
+  };
+}
+
 // Pareamento celular ↔ Smart TV (código curto + validação no servidor)
 const tvPairs = new Map();
 function tvCode() { return String(Math.floor(100000 + Math.random() * 900000)); }
@@ -756,6 +786,6 @@ module.exports = {
   CFG, getConfig, villaDef, collection, spin, raid, build, advance, daily, missionClaim,
   village, ranking, amigosList, amigoAdd, amigoRemove, presente, tvRegister, tvConnect, tvStatus,
   snapshot, status: snapshot, computeWin, dropCat, roll, missionsSnapshot, eventosAtivos,
-  enemyLoot, stakePara,
+  enemyLoot, stakePara, adReward,
   GIFT_COST
 };
