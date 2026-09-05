@@ -341,6 +341,12 @@
   let userId = localStorage.getItem('match3_user') || ('player_' + Math.random().toString(36).slice(2,10));
   localStorage.setItem('match3_user', userId);
 
+  // Analytics (seção 38) + Telemetria de erros do cliente (seção 39)
+  try { fetch(API+'/api/gato/analytics',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'game_open',userId})}).catch(()=>{}); } catch(e){}
+  window.onerror = function(m, s, l, c){
+    try { fetch(API+'/api/gato/telemetry',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'client_js',msg:(s||'')+' '+l+':'+c})}).catch(()=>{}); } catch(e){}
+  };
+
   const $ = id => document.getElementById(id);
   const fmt = n => Number(n).toLocaleString('pt-BR');
   const SYMS = ['🐱','🐟','🧶','🥛','🐁','🛡️','🎁','🐾','❌'];

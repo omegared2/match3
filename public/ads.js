@@ -74,6 +74,7 @@
   function doRewarded(opts) {
     opts = opts || {};
     postAdEvent('recompensado');
+    try { fetch(API + '/api/gato/analytics', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'rewarded_ad_started', userId: USER_ID }) }).catch(function () {}); } catch (e) {}
     // modo real: unidade nativa ainda não configurada — rende via overlay/timer
     var amount = (opts.coins || opts.amount) || 0;
     function finish() { if (opts.onComplete) opts.onComplete(); }

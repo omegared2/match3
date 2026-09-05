@@ -87,6 +87,27 @@ const recent = [];
 
 function getConfig() { return JSON.parse(JSON.stringify(CFG)); }
 
+// Config editável pelo servidor (seção 36): validada e aplicada em tempo real.
+const CONFIG_ALLOW = {
+  spinCost: 1, betGrowth: 1, payoutMult: 1, dailyReward: 1, villageCostGrowth: 1,
+  adReward: 1, adCooldownSec: 1, adDailyCap: 1, giftCost: 1,
+  streakBase: 1, streakMax: 1, streakFinalMult: 1,
+  raidPrizeMult: 1, defenseChance: 1, enemyStealPct: 1,
+  ppPerLevel: 1, luckConsolation: 1
+};
+function setConfig(key, value) {
+  if (!CONFIG_ALLOW[key]) return { error: 'chave não editável' };
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return { error: 'valor inválido' };
+  if (key === 'betGrowth' || key === 'villageCostGrowth' || key === 'enemyStealPct' ||
+      key === 'defenseChance' || key === 'streakBase' || key === 'payoutMult' ||
+      key === 'raidPrizeMult' || key === 'luckConsolation') {
+    if (n > 1000) return { error: 'valor inválido' };
+  }
+  CFG[key] = n;
+  return { ok: true, key, value: n };
+}
+
 // PRNG determinístico (mulberry32) — servidor decide, cliente só anima
 function seeded(seed) {
   let a = seed | 0;
@@ -108,10 +129,34 @@ const EVENTS = [
   { id: 'sorte', nome: 'Evento da Sorte',     e: '🍀', de: '2026-09-01', ate: '2026-10-01', efeito: { coinsMult: 1.2 }, txt: '+20% moedas nos giros 🪙' },
   { id: 'saque', nome: 'Evento do Saque',     e: '🎁', de: '2026-09-05', ate: '2026-09-12', efeito: { raidMult: 1.3 },  txt: '+30% recompensa de saque' }
 ];
+function listEvents() {
+  return EVENTS.map(e => ({
+    id: e.id, nome: e.nome, e: e.e, de: e.de, ate: e.ate, txt: e.txt,
+    efeito: e.efeito, ligado: !e.desligado
+  }));
+}
+function addEvent(o) {
+  o = o || {};
+  const id = String(o.id || '').trim();
+  if (!/^[A-Za-z0-9_-]{1,20}$/.test(id)) return { error: 'id inválido' };
+  if (!o.nome || !o.de || !o.ate || !o.efeito) return { error: 'dados incompletos' };
+  if (String(o.de) > String(o.ate)) return { error: 'período inválido' };
+  const def = { id, nome: String(o.nome).slice(0, 40), e: String(o.e || '⭐').slice(0, 4),
+    de: String(o.de), ate: String(o.ate), txt: String(o.txt || '').slice(0, 60),
+    efeito: o.efeito, desligado: false };
+  EVENTS.push(def);
+  return { ok: true, evento: def };
+}
+function setEvent(id, patch) {
+  const e = EVENTS.find(x => x.id === id);
+  if (!e) return { error: 'evento não existe' };
+  if (patch && 'ligado' in patch) e.desligado = !patch.ligado;
+  return { ok: true, evento: listEvents().find(x => x.id === id) };
+}
 function eventosAtivos() {
   if (process.env.GATO_EVENTOS === 'off') return [];
   const hoje = todayStr();
-  return EVENTS.filter(e => e.de <= hoje && hoje <= e.ate).map(e => ({
+  return EVENTS.filter(e => !e.desligado && e.de <= hoje && hoje <= e.ate).map(e => ({
     id: e.id, nome: e.nome, e: e.e, txt: e.txt, ate: e.ate,
     dias: Math.max(0, Math.ceil((new Date(e.ate + 'T23:59:59Z') - Date.now()) / 86400000)),
     efeito: e.efeito
@@ -783,7 +828,8 @@ function snapshot() {
 }
 
 module.exports = {
-  CFG, getConfig, villaDef, collection, spin, raid, build, advance, daily, missionClaim,
+  CFG, getConfig, setConfig, listEvents, addEvent, setEvent,
+  villaDef, collection, spin, raid, build, advance, daily, missionClaim,
   village, ranking, amigosList, amigoAdd, amigoRemove, presente, tvRegister, tvConnect, tvStatus,
   snapshot, status: snapshot, computeWin, dropCat, roll, missionsSnapshot, eventosAtivos,
   enemyLoot, stakePara, adReward,

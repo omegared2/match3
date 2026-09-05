@@ -16,6 +16,7 @@ const gato = require('./gato');
 const wscl = require('./wscl');
 const criador = require('./criador');
 const limit = require('./limiter');
+const adminseg = require('./admin');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -81,6 +82,17 @@ function limitaIp(max, windowMs) {
   };
 }
 
+// ---- Painel administrativo (seções 36-39) ----
+function adToken(req) {
+  return String(req.headers['x-admin'] || (req.headers['authorization'] || '').replace(/^Bearer\s+/i, ''));
+}
+function adminOnly(req, res, next) {
+  if (!adminseg.auth(adToken(req))) return res.status(401).json({ error: 'não autorizado' });
+  next();
+}
+const ANALYTICS_TYPES = ['game_open', 'spin_start', 'spin_result', 'building_upgrade', 'village_complete',
+  'attack', 'raid', 'mission_complete', 'rewarded_ad_started', 'rewarded_ad_completed', 'ad_reward_claimed'];
+
 // Se for compra do Criador de Vídeos, libera o usuário em vez de dar moedas
 function aplicarCredito(stored) {
   if (stored && String(stored.packId).startsWith('CRIADOR_')) {
@@ -139,6 +151,7 @@ app.post('/api/ad-event', express.json(), limitaIp(60, 30000), (req, res) => {
     adState.dayRevenue = 0;
   }
   adState.dayRevenue += rev;
+  if (t === 'recompensado') adminseg.log('rewarded_ad_completed', networkName || '');
   adState.events.unshift({
     ts: Date.now(),
     type: t,
@@ -176,6 +189,7 @@ app.get('/loteria', (req, res) => res.sendFile(path.join(__dirname, 'public', 'l
 app.get('/turbo', (req, res) => res.sendFile(path.join(__dirname, 'public', 'turbo.html')));
 app.get('/gato', (req, res) => res.sendFile(path.join(__dirname, 'public', 'gato.html')));
 app.get('/gato-tv', (req, res) => res.sendFile(path.join(__dirname, 'public', 'gato-tv.html')));
+app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 app.get('/criador', (req, res) => res.sendFile(path.join(__dirname, 'public', 'criador.html')));
 app.get('/pisstoll', (req, res) => res.sendFile(path.join(__dirname, 'public', 'pisstoll.html')));
 app.get('/divulgar', (req, res) => res.sendFile(path.join(__dirname, 'public', 'divulgar.html')));
@@ -549,6 +563,88 @@ function pushSinc(userId) {
 app.get('/api/gato/status', (req, res) => res.json(gato.status()));
 app.use('/api/gato', limitaIp(150, 15000));
 
+// ---- Analytics (38) e Telemetria (39) vindos do cliente ----
+app.post('/api/gato/analytics', async (req, res) => {
+  try {
+    const type = String((req.body && req.body.type) || '');
+    const userId = uid(req.body && req.body.userId);
+    if (!ANALYTICS_TYPES.includes(type)) return res.status(400).json({ error: 'tipo inválido' });
+    adminseg.log(type, userId || '');
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'erro ao registrar' });
+  }
+});
+app.post('/api/gato/telemetry', async (req, res) => {
+  try {
+    const kind = String((req.body && req.body.kind) || 'client');
+    const msg = String((req.body && req.body.msg) || '');
+    if (!/^[A-Za-z0-9_-]{1,24}$/.test(kind)) return res.status(400).json({ error: 'tipo inválido' });
+    adminseg.tele(kind, msg.slice(0, 200));
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'erro ao registrar' });
+  }
+});
+
+// ---- Painel /admin ----
+app.post('/api/admin/login', (req, res) => {
+  const token = adminseg.login(String((req.body && req.body.pass) || ''));
+  if (!token) return res.status(401).json({ error: 'senha incorreta' });
+  res.json({ token });
+});
+app.post('/api/admin/logout', adminOnly, (req, res) => {
+  adminseg.logout(adToken(req)); res.json({ ok: true });
+});
+app.get('/api/admin/config', adminOnly, (req, res) => res.json({ config: gato.getConfig() }));
+app.post('/api/admin/config', adminOnly, (req, res) => {
+  const r = gato.setConfig(String((req.body && req.body.key) || ''), req.body && req.body.value);
+  if (r.error) return res.status(400).json({ error: r.error });
+  adminseg.log('config_set', r.key + '=' + r.value);
+  res.json({ ok: true, key: r.key, value: r.value, config: gato.getConfig() });
+});
+app.get('/api/admin/events', adminOnly, (req, res) => res.json({ events: gato.listEvents() }));
+app.post('/api/admin/event', adminOnly, (req, res) => {
+  const action = String((req.body && req.body.action) || '');
+  let r;
+  if (action === 'toggle') {
+    r = gato.setEvent(String((req.body && req.body.id) || ''), { ligado: !!req.body.ligado });
+    if (!r.error) adminseg.log('event_toggle', r.evento.id + '=' + (r.evento.ligado ? 'on' : 'off'));
+  } else if (action === 'create') {
+    r = gato.addEvent(req.body && req.body.event);
+    if (!r.error) adminseg.log('event_create', r.evento.id);
+  } else return res.status(400).json({ error: 'ação inválida' });
+  if (r.error) return res.status(400).json({ error: r.error });
+  res.json({ ok: true, evento: r.evento });
+});
+app.get('/api/admin/users', adminOnly, async (req, res) => {
+  try {
+    const [stats, top] = await Promise.all([db.dbAdminStats(), db.dbLeaderboard(100)]);
+    res.json({ stats, top });
+  } catch (err) { res.status(500).json({ error: 'erro ao listar usuários' }); }
+});
+app.get('/api/admin/ads', adminOnly, (req, res) => {
+  res.json({ totals: adState.totals, totalRevenue: adState.totalRevenue, dayRevenue: adState.dayRevenue, last: adState.events.slice(0, 20) });
+});
+app.get('/api/admin/analytics', adminOnly, (req, res) => res.json(adminseg.analytics()));
+app.get('/api/admin/errors', adminOnly, (req, res) => res.json({ errors: adminseg.errorsTail(), state: adminseg.state() }));
+app.get('/api/admin/audit', adminOnly, (req, res) => res.json({ audit: adminseg.auditTail() }));
+app.post('/api/admin/balance', adminOnly, async (req, res) => {
+  try {
+    const userId = uid(req.body && req.body.userId);
+    const delta = Number((req.body && req.body.delta) || 0);
+    const motivo = String((req.body && req.body.motivo) || '');
+    if (!userId) return res.status(400).json({ error: 'userId inválido' });
+    if (!Number.isFinite(delta) || delta === 0 || Math.abs(delta) > 1000000) return res.status(400).json({ error: 'delta inválido' });
+    const ant = await db.dbGetUser(userId);
+    const r = delta > 0 ? await db.dbAddCoins(userId, delta) : await db.dbSpendCoins(userId, -delta);
+    if (!r || !r.balance) return res.status(400).json({ error: 'saldo insuficiente' });
+    adminseg.auditAdd(adToken(req).slice(0, 8), userId, delta, motivo, (ant && ant.balance) || 0, r.balance);
+    res.json({ ok: true, balance: r.balance, // auditoria registrada
+    });
+  } catch (err) { res.status(500).json({ error: 'erro ao ajustar saldo' }); }
+});
+
 app.get('/api/gato/ranking', async (req, res) => {
   try {
     const r = await gato.ranking(db, String(req.query.userId || ''));
@@ -584,6 +680,7 @@ app.post('/api/gato/amigos/add', async (req, res) => {
     res.json(r);
   } catch (err) {
     console.error('Erro ao adicionar amigo:', err.message);
+    adminseg.tele('adicionar', err.message);
     res.status(500).json({ error: 'Erro ao adicionar amigo' });
   }
 });
@@ -601,6 +698,7 @@ app.post('/api/gato/amigos/remove', async (req, res) => {
     res.json(r);
   } catch (err) {
     console.error('Erro ao remover amigo:', err.message);
+    adminseg.tele('remover', err.message);
     res.status(500).json({ error: 'Erro ao remover amigo' });
   }
 });
@@ -619,6 +717,7 @@ app.post('/api/gato/presente', async (req, res) => {
     res.json(r);
   } catch (err) {
     console.error('Erro no presente do gato:', err.message);
+    adminseg.tele('presente', err.message);
     res.status(500).json({ error: 'Erro no presente' });
   }
 });
@@ -666,10 +765,12 @@ app.post('/api/gato/mission-claim', async (req, res) => {
     if (!lb.ok) return res.status(429).json({ error: 'Muito rápido — aguarde um pouco', retryAfter: lb.retryAfter });
     const r = await runExclusive(userId, () => gato.missionClaim(db, userId, id));
     if (r.error) return res.status(400).json({ error: r.error });
+    adminseg.log('mission_complete', id);
     pushSinc(userId);
     res.json(r);
   } catch (err) {
     console.error('Erro na missão do gato:', err.message);
+    adminseg.tele('missao', err.message);
     res.status(500).json({ error: 'Erro na missão' });
   }
 });
@@ -692,12 +793,16 @@ app.post('/api/gato/spin', async (req, res) => {
     const nick = nickSan(req.body && req.body.nick);
     const lb = limit.rate('u:' + userId, 30, 15000);
     if (!lb.ok) return res.status(429).json({ error: 'Muito rápido — aguarde um pouco', retryAfter: lb.retryAfter });
+    adminseg.log('spin_start', userId);
     const r = await runExclusive(userId, () => gato.spin(db, userId, nick));
     if (r.error) return res.status(400).json({ error: r.error });
+    adminseg.log('spin_result', r.kind || '?');
+    if (r.kind === 'attack') adminseg.log('attack', userId);
     pushSinc(userId);
     res.json(r);
   } catch (err) {
     console.error('Erro no gato:', err.message);
+    adminseg.tele('spin', err.message);
     res.status(500).json({ error: 'Erro no gato' });
   }
 });
@@ -712,6 +817,7 @@ app.post('/api/gato/raid', async (req, res) => {
     if (!lb.ok) return res.status(429).json({ error: 'Muito rápido — aguarde um pouco', retryAfter: lb.retryAfter });
     const r = await runExclusive(userId, () => gato.raid(db, userId, pick));
     if (r.error) return res.status(400).json({ error: r.error });
+    adminseg.log('raid', String(r.prize));
     pushSinc(userId);
     res.json(r);
   } catch (err) {
@@ -728,10 +834,13 @@ app.post('/api/gato/build', async (req, res) => {
     if (!lb.ok) return res.status(429).json({ error: 'Muito rápido — aguarde um pouco', retryAfter: lb.retryAfter });
     const r = await runExclusive(userId, () => gato.build(db, userId));
     if (r.error) return res.status(400).json({ error: r.error });
+    adminseg.log('building_upgrade', (r.building && r.building.nome) || '?');
+    if (r.complete) adminseg.log('village_complete', userId);
     pushSinc(userId);
     res.json(r);
   } catch (err) {
     console.error('Erro ao construir vila do gato:', err.message);
+    adminseg.tele('build', err.message);
     res.status(500).json({ error: 'Erro ao construir' });
   }
 });
@@ -748,6 +857,7 @@ app.post('/api/gato/advance', async (req, res) => {
     res.json(r);
   } catch (err) {
     console.error('Erro ao avançar vila do gato:', err.message);
+    adminseg.tele('avançar', err.message);
     res.status(500).json({ error: 'Erro ao avançar' });
   }
 });
@@ -764,6 +874,7 @@ app.post('/api/gato/daily', async (req, res) => {
     res.json(r);
   } catch (err) {
     console.error('Erro na diária do gato:', err.message);
+    adminseg.tele('diaria', err.message);
     res.status(500).json({ error: 'Erro na diária' });
   }
 });
@@ -776,10 +887,12 @@ app.post('/api/gato/ad-reward', async (req, res) => {
     if (!lb.ok) return res.status(429).json({ error: 'Muito rápido — aguarde um pouco', retryAfter: lb.retryAfter });
     const r = await runExclusive(userId, () => gato.adReward(db, userId));
     if (r.error) return res.status(r.retryIn ? 429 : 400).json({ error: r.error, retryIn: r.retryIn || 0 });
+    adminseg.log('ad_reward_claimed', userId);
     pushSinc(userId);
     res.json(r);
   } catch (err) {
     console.error('Erro no anúncio do gato:', err.message);
+    adminseg.tele('anuncio', err.message);
     res.status(500).json({ error: 'Erro no anúncio' });
   }
 });
