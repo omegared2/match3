@@ -1,6 +1,10 @@
 // Persistência do backend.
 // Se DATABASE_URL existir -> usa Postgres (produção).
-// Senão -> usa memória (rodar localmente / testes).
+// Senão -> usa memória, com SNAPSHOT EM ARQUIVO atômico (sobrevive a restart).
+// Desligar snapshot: GT_STATE_FILE=off. Caminho custom: GT_STATE_FILE=/caminho/state.json.
+
+const fs = require('fs');
+const path = require('path');
 
 let pool = null;
 let mode = 'memory';
@@ -9,14 +13,86 @@ const memUsers = new Map();
 const memPayments = new Map();
 const memChars = new Map();
 
+// ---- snapshot em arquivo ----
+let stateFile = null;
+let dirty = false;
+let flushTimer = null;
+let writeChain = Promise.resolve();
+
 function memoryUser(id) {
-  if (!memUsers.has(id)) memUsers.set(id, { balance: 100 });
+  if (!memUsers.has(id)) { memUsers.set(id, { balance: 100 }); mark(); }
   return memUsers.get(id);
+}
+
+function mark() {
+  if (!stateFile) return;
+  dirty = true;
+  if (flushTimer) return;
+  flushTimer = setTimeout(() => { flushTimer = null; flushNow(); }, 1500);
+}
+
+async function flushNow() {
+  if (!stateFile || !dirty) return;
+  dirty = false;
+  writeChain = writeChain.then(async () => {
+    try {
+      const data = JSON.stringify({
+        version: 1,
+        users: [...memUsers.entries()],
+        payments: [...memPayments.entries()],
+        chars: [...memChars.entries()]
+      });
+      const tmp = stateFile + '.tmp';
+      await fs.promises.mkdir(path.dirname(stateFile), { recursive: true });
+      await fs.promises.writeFile(tmp, data, 'utf8');
+      await fs.promises.rename(tmp, stateFile);
+    } catch (err) {
+      console.error('⚠️  Falha ao salvar snapshot:', err.message);
+    }
+  });
+}
+
+// Síncrono, para desligamento limpo (SIGTERM/SIGINT).
+function flushSync() {
+  if (!stateFile || !dirty) return;
+  try {
+    const data = JSON.stringify({
+      version: 1,
+      users: [...memUsers.entries()],
+      payments: [...memPayments.entries()],
+      chars: [...memChars.entries()]
+    });
+    fs.mkdirSync(path.dirname(stateFile), { recursive: true });
+    fs.writeFileSync(stateFile + '.tmp', data, 'utf8');
+    fs.renameSync(stateFile + '.tmp', stateFile);
+    dirty = false;
+  } catch (err) {
+    console.error('⚠️  Falha ao salvar snapshot final:', err.message);
+  }
+}
+
+function loadState() {
+  try {
+    const data = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+    if (data && Array.isArray(data.users)) for (const [k, v] of data.users) memUsers.set(k, v);
+    if (data && Array.isArray(data.payments)) for (const [k, v] of data.payments) memPayments.set(k, v);
+    if (data && Array.isArray(data.chars)) for (const [k, v] of data.chars) memChars.set(k, JSON.parse(JSON.stringify(v)));
+    console.log(`💾 Snapshot carregado (${memUsers.size} usuários, ${memPayments.size} pagamentos, ${memChars.size} personagens)`);
+  } catch (_) { /* primeiro boot: sem arquivo ainda */ }
 }
 
 // Cria as tabelas caso não existam. Retorna o modo ativo.
 async function initDb() {
-  if (!process.env.DATABASE_URL) return 'memory';
+  if (!process.env.DATABASE_URL) {
+    if (process.env.GT_STATE_FILE !== 'off') {
+      stateFile = process.env.GT_STATE_FILE || path.join(__dirname, 'data', 'state.json');
+      try { await fs.promises.mkdir(path.dirname(stateFile), { recursive: true }); } catch (_) {}
+      loadState();
+      const iv = setInterval(() => flushNow(), 30000);
+      if (iv.unref) iv.unref();
+    }
+    return 'memory';
+  }
   try {
     const { Pool } = require('pg');
     pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -70,6 +146,7 @@ async function dbAddCoins(id, amount) {
   if (mode === 'memory') {
     const u = memoryUser(id);
     u.balance += amount;
+    mark();
     return { balance: u.balance };
   }
   await pool.query(
@@ -86,6 +163,7 @@ async function dbSpendCoins(id, cost) {
     const u = memoryUser(id);
     if (u.balance < cost) return null;
     u.balance -= cost;
+    mark();
     return { balance: u.balance };
   }
   const r = await pool.query(
@@ -99,6 +177,7 @@ async function dbSpendCoins(id, cost) {
 async function dbSavePayment(paymentId, data) {
   if (mode === 'memory') {
     memPayments.set(paymentId, { ...data, status: 'pending' });
+    mark();
     return;
   }
   await pool.query(
@@ -122,6 +201,7 @@ async function dbApprovePayment(paymentId) {
     const p = memPayments.get(paymentId);
     if (p && p.status !== 'approved') {
       p.status = 'approved';
+      mark();
       return p;
     }
     return null;
@@ -143,7 +223,7 @@ function defaultChar() {
 
 async function dbGetCharacter(id) {
   if (mode === 'memory') {
-    if (!memChars.has(id)) memChars.set(id, defaultChar());
+    if (!memChars.has(id)) { memChars.set(id, defaultChar()); mark(); }
     return JSON.parse(JSON.stringify(memChars.get(id)));
   }
   const r = await pool.query('SELECT data FROM characters WHERE id=$1', [id]);
@@ -158,6 +238,7 @@ async function dbGetCharacter(id) {
 async function dbSetCharacter(id, data) {
   if (mode === 'memory') {
     memChars.set(id, JSON.parse(JSON.stringify(data)));
+    mark();
     return;
   }
   await pool.query(
@@ -260,5 +341,7 @@ module.exports = {
   dbSetCharacter,
   dbAdminStats,
   dbLeaderboard,
+  flushSync,
+  flushNow,
   defaultChar
 };

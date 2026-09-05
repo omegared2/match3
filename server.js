@@ -1151,12 +1151,21 @@ db.initDb().then(() => {
     console.log(`✅ Servidor rodando em http://localhost:${PORT}`);
     console.log(`   Jogo servido de: ${GAME_DIR}`);
     console.log(`   URL pública (produção): ${process.env.BASE_URL}`);
-    console.log(`   Banco de dados: ${process.env.DATABASE_URL ? 'Postgres' : 'memória'}`);
+    console.log(`   Banco de dados: ${process.env.DATABASE_URL ? 'Postgres' : 'memória + snapshot em arquivo'}`);
     console.log('');
     if (!process.env.MP_ACCESS_TOKEN) {
       console.log('⚠️  MP_ACCESS_TOKEN não configurado! Edite o arquivo .env');
     }
   });
+
+  const desliga = () => {
+    console.log('💾 Salvando estado antes de desligar...');
+    db.flushSync();
+    process.exit(0);
+  };
+  process.on('SIGTERM', desliga);
+  process.on('SIGINT', desliga);
+  process.on('uncaughtException', () => db.flushSync());
   const wsReal = wscl.iniciar(server, db);
   app.set('wsReal', wsReal);
 });
