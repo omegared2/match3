@@ -151,6 +151,7 @@ function defaultVillage() {
   return {
     vid: 1, built: {}, coinsSpent: 0, pp: 0, level: 1, lastDaily: null, advances: 0,
     shields: 0, raid: null, cats: [], collectionRewarded: false, streak: 0, catPity: 0,
+    amigos: [], presentes: {},
     missions: { day: todayStr(), spins: 0, builds: 0, attacks: 0, villas: 0, claimed: {} }
   };
 }
@@ -587,6 +588,110 @@ async function missionClaim(db, userId, id) {
   };
 }
 
+const GIFT_COST = Number(process.env.GT_GIFT_COST) || 50;
+
+// Pareamento celular ↔ Smart TV (código curto + validação no servidor)
+const tvPairs = new Map();
+function tvCode() { return String(Math.floor(100000 + Math.random() * 900000)); }
+
+async function amigoRef(db, id) {
+  const char = await db.dbGetCharacter(id);
+  const v = { ...defaultVillage(), ...((char && char.village) || {}) };
+  const user = await db.dbGetUser(id);
+  return { id, nick: id.slice(0, 14), level: Math.floor((v.pp || 0) / CFG.ppPerLevel) + 1,
+           vid: v.vid, cats: (v.cats || []).length, coins: user.balance };
+}
+
+async function amigosList(db, userId) {
+  if (!userId) return { error: 'userId obrigatório' };
+  const char = await db.dbGetCharacter(userId);
+  const v = { ...defaultVillage(), ...((char && char.village) || {}) };
+  const ids = v.amigos || [];
+  const list = [];
+  for (const id of ids) list.push(await amigoRef(db, id));
+  return { amigos: list, limite: 20, presenteHoje: Object.keys(v.presentes || {}).filter(pid => v.presentes[pid] === todayStr()) };
+}
+
+async function amigoAdd(db, userId, codigo) {
+  if (!userId) return { error: 'userId obrigatório' };
+  const alvo = String(codigo || '').trim();
+  if (!alvo) return { error: 'Digite o código do amigo' };
+  if (alvo === userId) return { error: 'Você não pode ser seu próprio amigo 😸' };
+  if (!(await db.dbUserExists(alvo))) return { error: 'Este código não existe. Já jogou alguma vez?' };
+  const char = await db.dbGetCharacter(userId);
+  const v = { ...defaultVillage(), ...((char && char.village) || {}) };
+  v.amigos = v.amigos || [];
+  if (v.amigos.includes(alvo)) return { error: 'Já é seu amigo!' };
+  if (v.amigos.length >= 20) return { error: 'Limite de 20 amigos atingido' };
+  v.amigos.push(alvo);
+  await db.dbSetCharacter(userId, { ...(char || {}), village: v });
+  const ref = await amigoRef(db, alvo);
+  return { ok: true, amigo: ref };
+}
+
+async function amigoRemove(db, userId, codigo) {
+  if (!userId) return { error: 'userId obrigatório' };
+  const char = await db.dbGetCharacter(userId);
+  const v = { ...defaultVillage(), ...((char && char.village) || {}) };
+  v.amigos = (v.amigos || []).filter(x => x !== codigo);
+  delete (v.presentes)[codigo];
+  await db.dbSetCharacter(userId, { ...(char || {}), village: v });
+  return { ok: true };
+}
+
+async function presente(db, userId, codigo) {
+  if (!userId) return { error: 'userId obrigatório' };
+  const alvo = String(codigo || '').trim();
+  if (!alvo) return { error: 'Convida um amigo primeiro' };
+  const char = await db.dbGetCharacter(userId);
+  const v = { ...defaultVillage(), ...((char && char.village) || {}) };
+  if (!(v.amigos || []).includes(alvo)) return { error: 'Só dá presente pra amigo 😊' };
+  const user = await db.dbGetUser(userId);
+  if (user.balance < GIFT_COST) return { error: `Precisa de ${GIFT_COST} moedas pra presentear` };
+  v.presentes = v.presentes || {};
+  if (v.presentes[alvo] === todayStr()) return { error: 'Você já mandou presente hoje. Volta amanhã!' };
+  const ok = await db.dbSpendCoins(userId, GIFT_COST);
+  if (!ok) return { error: 'Saldo insuficiente' };
+  await db.dbAddCoins(alvo, GIFT_COST);
+  v.presentes[alvo] = todayStr();
+  await db.dbSetCharacter(userId, { ...(char || {}), village: v });
+  const ref = await amigoRef(db, alvo);
+  return { ok: true, custo: GIFT_COST, amigo: ref, balance: (await db.dbGetUser(userId)).balance };
+}
+
+function tvRegister(tvId) {
+  if (!tvId) return { error: 'tvId obrigatório' };
+  let p = [...tvPairs.values()].find(x => x.tvId === tvId);
+  if (p && p.exp > Date.now()) return { ok: true, code: p.code, expiraSec: Math.floor((p.exp - Date.now()) / 1000) };
+  const code = tvCode();
+  tvPairs.set(code, { tvId, userId: null, exp: Date.now() + 120000, code });
+  return { ok: true, code, expiraSec: 120 };
+}
+
+function tvConnect(code, userId) {
+  if (!code) return { error: 'Digite o código mostrado na TV' };
+  if (!userId) return { error: 'userId obrigatório' };
+  const p = tvPairs.get(String(code));
+  if (!p || p.exp < Date.now()) return { error: 'Código inválido ou expirado. Tenta de novo na TV!' };
+  p.userId = userId;
+  return { ok: true, tvId: p.tvId };
+}
+
+async function tvStatus(db, tvId) {
+  if (!tvId) return { error: 'tvId obrigatório' };
+  const reg = tvRegister(tvId);
+  if (reg.error) return reg;
+  const p = [...tvPairs.values()].find(x => x.tvId === tvId);
+  const base = { ok: true, code: p.code, expiraSec: reg.expiraSec, connected: !!p.userId, userId: p.userId };
+  if (p.userId) {
+    const char = await db.dbGetCharacter(p.userId);
+    const v = { ...defaultVillage(), ...((char && char.village) || {}) };
+    const user = await db.dbGetUser(p.userId);
+    base.village = { village: villageSnapshot(v), balance: user.balance };
+  }
+  return base;
+}
+
 async function ranking(db, userId, limit = 20) {
   const rows = await db.dbLeaderboard(limit);
   const list = rows.map((r, i) => ({
@@ -629,5 +734,7 @@ function snapshot() {
 
 module.exports = {
   CFG, getConfig, villaDef, collection, spin, raid, build, advance, daily, missionClaim,
-  village, ranking, snapshot, status: snapshot, computeWin, dropCat, roll, missionsSnapshot, eventosAtivos
+  village, ranking, amigosList, amigoAdd, amigoRemove, presente, tvRegister, tvConnect, tvStatus,
+  snapshot, status: snapshot, computeWin, dropCat, roll, missionsSnapshot, eventosAtivos,
+  GIFT_COST
 };

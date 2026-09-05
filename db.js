@@ -59,6 +59,13 @@ async function dbGetUser(id) {
   return { balance: r.rows[0].balance };
 }
 
+// Existe usuário de verdade? (não cria/registra — usado p/ validar amigos e pareamento)
+async function dbUserExists(id) {
+  if (mode === 'memory') return memUsers.has(id) || memChars.has(id);
+  const r = await pool.query('SELECT 1 FROM users WHERE id=$1', [id]);
+  return r.rowCount > 0;
+}
+
 async function dbAddCoins(id, amount) {
   if (mode === 'memory') {
     const u = memoryUser(id);
@@ -243,6 +250,7 @@ async function dbLeaderboard(limit = 20) {
 module.exports = {
   initDb,
   dbGetUser,
+  dbUserExists,
   dbAddCoins,
   dbSpendCoins,
   dbSavePayment,

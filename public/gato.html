@@ -179,6 +179,23 @@
   .rk-meta { color:#86a07f; font-size:11px; }
   .rk-val { font-weight:900; color:#ffd968; }
 
+  /* amigos */
+  .addAm { display:flex; gap:8px; width:min(350px,94vw); margin:0 auto 12px; }
+  .addAm input { flex:1; border:none; border-radius:14px; padding:13px; font-size:15px; font-weight:700;
+    background:rgba(255,255,255,.1); color:#fff; border:1px solid rgba(255,255,255,.15); outline:none; }
+  .addAm button { border:none; border-radius:14px; padding:0 18px; font-size:15px; font-weight:900; cursor:pointer;
+    background:linear-gradient(135deg,#4ade80,#16a34a); color:#06280f; }
+  .amigo { display:flex; align-items:center; gap:10px; border-radius:16px; padding:10px 12px; margin-bottom:8px;
+    background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.09); }
+  .amigo .aicon { font-size:28px; }
+  .amigo .ainfo { flex:1; text-align:left; min-width:0; }
+  .amigo .an { font-weight:800; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .amigo .am2 { font-size:11px; color:#86a07f; }
+  .amigo button { border:none; border-radius:12px; padding:8px 12px; font-size:12px; font-weight:900; cursor:pointer; }
+  .aPres { background:linear-gradient(135deg,#ffd968,#ff8a00); color:#3a2400; }
+  .aPres.on { background:rgba(255,255,255,.1); color:#86a07f; cursor:default; }
+  .aRm { background:rgba(255,90,90,.15); color:#ff9a9a; }
+
   /* modal de saque */
   .modal { position:fixed; inset:0; z-index:60; display:flex; flex-direction:column; justify-content:center; align-items:center;
     background:rgba(6,12,7,.88); backdrop-filter:blur(6px); padding:20px; }
@@ -208,6 +225,7 @@
   <button class="tab" id="tabVila">🏠 Vila</button>
   <button class="tab" id="tabCol">🐾 Coleção</button>
   <button class="tab" id="tabRk">🏆 Ranking</button>
+  <button class="tab" id="tabAm">👥 Amigos</button>
 </div>
 
 <div class="panel" id="panelSlot">
@@ -252,6 +270,22 @@
   <div class="col-ti">🏆 RANKING GLOBAL</div>
   <div class="vsub" id="rkMe"></div>
   <div class="rk" id="rkList"></div>
+</div>
+
+<div class="panel hidden" id="panelAm">
+  <div class="col-ti">👥 AMIGOS</div>
+  <div class="addAm">
+    <input id="amigoCode" placeholder="Código do amigo" maxlength="24" autocomplete="off"/>
+    <button id="amAdd">➕</button>
+  </div>
+  <div class="col-ti">📺 CONECTAR À TV</div>
+  <div class="addAm">
+    <input id="tvCode" placeholder="Código da TV (6 dígitos)" maxlength="6" autocomplete="off"/>
+    <button id="tvConn">📺</button>
+  </div>
+  <div class="rk" id="amigos">
+    <div class="vsub" style="padding:20px">Convida um amigo pelo código dele pra se adicionar.<br/>🎁 Presente = 50 moedas, 1× por dia por amigo.<br/>O teu código é: <b style="color:#ffd968" id="meuCodigo"></b></div>
+  </div>
 </div>
 
 <div class="recent">
@@ -508,6 +542,52 @@
     }).catch(()=>{});
   }
 
+  function renderAmigos(){
+    fetch(API+'/api/gato/amigos?userId='+userId).then(r=>r.json()).then(d=>{
+      if(d.error) return;
+      const list=d.amigos||[];
+      const cab='<div class="vsub" style="padding:14px 16px">Teu código: <b style="color:#ffd968" id="meuCodigo">'+userId+'</b> · Presente = 50🪙/dia por amigo</div>';
+      $('amigos').innerHTML = cab + (list.length
+        ? list.map(a=>{
+            const presenteHoje = (d.presenteHoje||[]).includes(a.id);
+            return '<div class="amigo"><span class="aicon">🐈</span>'+
+              '<span class="ainfo"><span class="an">'+a.nick+'</span>'+
+              '<span class="am2">L'+a.level+' · Vila '+a.vid+' · '+a.cats+'🐾 · '+fmt(a.coins)+'🪙</span></span>'+
+              '<button class="aPres'+(presenteHoje?' on':'')+'" data-p="'+a.id+'"'+(presenteHoje?' disabled':'')+'>'+(presenteHoje?'✓':'🎁')+'</button>'+
+              '<button class="aRm" data-r="'+a.id+'">✕</button></div>';
+          }).join('')
+        : '<div class="vsub" style="padding:20px">Ainda sem amigos.<br/>Teu código: <b style="color:#ffd968">'+userId+'</b></div>');
+      [...document.querySelectorAll('#amigos .aPres')].forEach(b=>b.onclick=()=>presentear(b.dataset.p));
+      [...document.querySelectorAll('#amigos .aRm')].forEach(b=>b.onclick=()=>remover(b.dataset.r));
+    }).catch(()=>{});
+  }
+
+  function adicionar(){
+    const c=$('amigoCode').value.trim();
+    if(!c) return toast('Digite o código do amigo');
+    post('/api/gato/amigos/add',{userId,codigo:c}).then(d=>{
+      if(d.error){ toast('❌ '+d.error); return; }
+      $('amigoCode').value=''; toast('👋 Amigo adicionado: '+d.amigo.nick+'!');
+      renderAmigos();
+    }).catch(()=>toast('Sem internet'));
+  }
+
+  function remover(codigo){
+    post('/api/gato/amigos/remove',{userId,codigo}).then(d=>{
+      if(d.error){ toast('❌ '+d.error); return; }
+      toast('Amigo removido'); renderAmigos();
+    }).catch(()=>toast('Sem internet'));
+  }
+
+  function presentear(codigo){
+    post('/api/gato/presente',{userId,codigo}).then(d=>{
+      if(d.error){ toast('❌ '+d.error); return; }
+      setCoins(d.balance || $('coins').textContent);
+      toast('🎁 Presente de '+fmt(d.custo)+' moedas enviado pra '+d.amigo.nick+'!');
+      renderAmigos();
+    }).catch(()=>toast('Sem internet'));
+  }
+
   function renderRanking(){
     fetch(API+'/api/gato/ranking?userId='+userId).then(r=>r.json()).then(d=>{
       if(d.error) return;
@@ -527,14 +607,24 @@
   $('btnDaily').onclick=diaria;
   $('raidClose').onclick=fecharSaque;
   function tab(id, on){
-    ['tabSlot','tabVila','tabCol','tabRk'].forEach(t=>$(t).className='tab'+(t===id?' on':''));
-    ['panelSlot','panelVila','panelCol','panelRk'].forEach(p=>$(p).classList.add('hidden'));
+    ['tabSlot','tabVila','tabCol','tabRk','tabAm'].forEach(t=>$(t).className='tab'+(t===id?' on':''));
+    ['panelSlot','panelVila','panelCol','panelRk','panelAm'].forEach(p=>$(p).classList.add('hidden'));
     $(on).classList.remove('hidden');
   }
   $('tabSlot').onclick=()=>tab('tabSlot','panelSlot');
   $('tabVila').onclick=()=>{ tab('tabVila','panelVila'); carregarVila(); };
   $('tabCol').onclick=()=>{ tab('tabCol','panelCol'); renderColecao(); };
   $('tabRk').onclick=()=>{ tab('tabRk','panelRk'); renderRanking(); };
+  $('tabAm').onclick=()=>{ tab('tabAm','panelAm'); renderAmigos(); };
+  $('amAdd').onclick=adicionar;
+  $('tvConn').onclick=()=>{
+    const code=$('tvCode').value.trim();
+    if(!code) return toast('Digite o código da TV');
+    post('/api/gato/tv/connect',{code,userId}).then(d=>{
+      if(d.error){ toast('❌ '+d.error); return; }
+      toast('📺 TV conectada! Abre a TV pra brincar na mesma conta.');
+    }).catch(()=>toast('Sem internet'));
+  };
 
   fetch(API+'/api/balance/'+userId).then(r=>r.json()).then(d=>setCoins(d.balance)).catch(()=>{});
   status(); setInterval(status,5000);

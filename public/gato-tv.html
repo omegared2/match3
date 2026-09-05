@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Gatinho — TV</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; color:#f2f8ef;
+    background:
+      radial-gradient(120% 90% at 50% -10%, rgba(124,212,124,.38), transparent 60%),
+      radial-gradient(80% 70% at 95% 110%, rgba(255,157,0,.2), transparent 60%),
+      linear-gradient(180deg,#0f1a11 0%,#0a110b 100%);
+    min-height:100vh; text-align:center; overflow:hidden;
+  }
+  .wrap { padding:24px 40px; }
+  header { display:flex; align-items:center; justify-content:space-between; padding:8px 40px 20px; }
+  header h1 { font-size:52px; font-weight:900; letter-spacing:2px;
+    background:linear-gradient(135deg,#ffe680,#ff9d00); -webkit-background-clip:text; background-clip:text; color:transparent;
+    filter:drop-shadow(0 4px 10px rgba(0,0,0,.5)); }
+  .coins { font-size:38px; font-weight:900; background:rgba(255,255,255,.08); border:2px solid rgba(255,255,255,.18);
+    border-radius:999px; padding:12px 26px; box-shadow:0 8px 24px rgba(0,0,0,.4); }
+  .coins b { color:#ffd968; }
+
+  /* pareamento */
+  .card { max-width:820px; margin:90px auto; background:linear-gradient(160deg,#1c2b1b,#111a12);
+    border:2px solid rgba(255,217,104,.45); border-radius:34px; padding:50px 40px;
+    box-shadow:0 30px 70px rgba(0,0,0,.55); }
+  .card h2 { font-size:44px; margin-bottom:14px; }
+  .card p { font-size:24px; color:#b7d3b0; line-height:1.5; }
+  #tvCodeBig { font-size:130px; font-weight:900; letter-spacing:14px; color:#ffd968;
+    text-shadow:0 0 40px rgba(255,190,0,.6); margin:20px 0; font-variant-numeric:tabular-nums; }
+  .passo { display:inline-block; margin-top:14px; border-radius:999px; padding:10px 24px; font-size:20px;
+    background:rgba(74,222,128,.18); border:1px solid rgba(74,222,128,.5); }
+
+  /* jogo na TV */
+  .row { display:flex; gap:34px; justify-content:center; align-items:flex-start; }
+  .col { flex:0 1 560px; }
+  .mascote { font-size:120px; line-height:1; filter:drop-shadow(0 14px 30px rgba(124,212,124,.5)); }
+  .machine { background:linear-gradient(160deg,#23331f,#141f14 80%); border:2px solid rgba(255,255,255,.16);
+    border-radius:34px; padding:26px; box-shadow:0 24px 60px rgba(0,0,0,.5), inset 0 -26px 60px rgba(0,0,0,.4); }
+  .slot { display:flex; gap:18px; justify-content:center; }
+  .reel { width:150px; height:190px; border-radius:24px; font-size:96px; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(120% 90% at 50% 0%, #1c301c, #0a120a 75%); border:3px solid rgba(255,255,255,.2);
+    box-shadow:inset 0 0 40px rgba(0,0,0,.8), inset 0 4px 0 rgba(124,212,124,.3); }
+  .btn { border:none; border-radius:22px; cursor:pointer; font-weight:900; font-size:26px;
+    background:linear-gradient(135deg,#ffd968,#ff8a00); color:#3a2400; padding:20px 30px;
+    box-shadow:0 12px 30px rgba(255,138,0,.4), inset 0 3px 0 rgba(255,255,255,.5); transition:transform .08s; }
+  .btn:active { transform:scale(.96); }
+  .btn:disabled { opacity:.5; cursor:default; }
+  .btn:focus, .foco { outline:6px solid #7dd3fc; outline-offset:5px; box-shadow:0 0 0 10px rgba(125,211,252,.25), 0 12px 30px rgba(255,138,0,.4); }
+  .btnG { margin:24px auto 8px; width:100%; font-size:30px; padding:24px; }
+  .pad { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:16px auto; max-width:560px; }
+  .btn2 { flex:1; border:none; border-radius:18px; padding:16px; font-size:22px; font-weight:900; cursor:pointer;
+    background:rgba(255,255,255,.1); color:#e8f3e4; border:2px solid rgba(255,255,255,.14); }
+  .btn2:focus, .foco2 { outline:6px solid #7dd3fc; outline-offset:4px; }
+  .meta { font-size:26px; color:#c8e3c0; margin-bottom:8px; }
+  .meta b { color:#ffd968; }
+  .sub { font-size:18px; color:#86a07f; min-height:28px; }
+  .daily { width:100%; max-width:560px; border:none; border-radius:20px; padding:18px; font-size:24px; font-weight:900; cursor:pointer;
+    background:linear-gradient(135deg,#7dd3fc,#38bdf8); color:#04222f; box-shadow:0 10px 26px rgba(56,189,248,.35); }
+  .daily:disabled { opacity:.55; }
+  .daily:focus { outline:6px solid #ffd968; outline-offset:4px; }
+  .msgTV { font-size:30px; font-weight:900; min-height:44px; padding:14px 0 4px; }
+  .msgTV.bom { color:#4ade80; } .msgTV.foi { color:#ff9090; }
+  .small { font-size:18px; color:#86a07f; padding-top:6px; }
+  .hidden { display:none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🐱 GATINHO·TV</h1>
+  <div class="coins">💰 <b id="coins">?</b> 🪙</div>
+</header>
+
+<div class="wrap">
+  <!-- etapas: 1 parear, 2 jogar -->
+  <div id="pairView" class="card">
+    <h2>📡 Conecte seu celular</h2>
+    <p>No celular, abra o Gatinho → <b>👥 Amigos → Conectar à TV</b><br/>e digite o código:</p>
+    <div id="tvCodeBig">······</div>
+    <span class="passo" id="tvStatus">Aguardando celular...</span>
+  </div>
+
+  <div id="gameView" class="hidden">
+    <div class="row">
+      <div class="col">
+        <div class="mascote">🐱</div>
+        <div class="machine">
+          <div class="slot">
+            <div class="reel" id="r0">🐱</div>
+            <div class="reel" id="r1">🐟</div>
+            <div class="reel" id="r2">🧶</div>
+          </div>
+          <button class="btn btnG" id="btnSpin" tabindex="0">🎰 GIRAR · 20 🪙</button>
+          <div class="msgTV" id="msg">Bem-vindo a TV! 🐾</div>
+          <div class="small" id="pityTV">🐾 Próximo gato: 0% · <span id="syn">Sincronizando...</span></div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="meta" id="vNameTV">— Vilas —</div>
+        <div class="meta">🏘️ Nível <b id="vlvlTV">1</b> · <span id="wNameTV">Mundo Inicial</span></div>
+        <div class="sub" id="vPosTV"></div>
+        <div class="sub" id="unlockTV"></div>
+        <div class="pad">
+          <button class="btn2" id="btnDaily" tabindex="0">🎁 Diária +40</button>
+          <button class="btn2" id="btnBuild" tabindex="0">🔨 Construir</button>
+          <button class="btn2" id="btnAdv" tabindex="0">🚀 Avançar</button>
+          <button class="btn2" id="btnRefresh" tabindex="0">🔄 Recarregar</button>
+        </div>
+        <div class="sub" id="buildTxt"></div>
+        <div class="small" id="eventosTV"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '';
+const tvId = new URLSearchParams(location.search).get('tvId') || localStorage.getItem('gato_tvId') || ('tv_' + Math.random().toString(36).slice(2,10));
+localStorage.setItem('gato_tvId', tvId);
+let userId = null;
+let me = 0;
+const $ = id => document.getElementById(id);
+const fmt = n => Number(n).toLocaleString('pt-BR');
+
+const SYMS = ['🐱','🐟','🧶','🥛','🐁','🛡️','🎁','🐾','❌'];
+const post = (p,b) => fetch(API+p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})}).then(r=>r.json());
+
+function msg(txtT,cls){ const el=$('msg'); el.textContent=txtT; el.className='msgTV '+(cls||''); }
+function animar(r0,r1,r2){
+  const t=setInterval(()=>{ r0.textContent=SYMS[Math.random()*SYMS.length|0]; r1.textContent=SYMS[Math.random()*SYMS.length|0]; r2.textContent=SYMS[Math.random()*SYMS.length|0]; },70);
+  return t;
+}
+
+function girarTV(){
+  $('btnSpin').disabled=true; msg('🎰 Girando...');
+  const r0=$('r0'),r1=$('r1'),r2=$('r2');
+  const t=animar(r0,r1,r2);
+  post('/api/gato/spin',{userId,nick:userId}).then(d=>{
+    if(d.error){ clearInterval(t); msg('❌ '+d.error,'foi'); $('btnSpin').disabled=false; return; }
+    setTimeout(()=>{
+      clearInterval(t);
+      r0.textContent=d.syms[0]; r1.textContent=d.syms[1]; r2.textContent=d.syms[2];
+      $('coins').textContent=fmt(d.balance||0);
+      if(d.kind==='all'||d.kind==='pair') msg(`🎉 ${d.syms.join('')} +${fmt(d.win)} 🪙`,'bom');
+      else if(d.kind==='shield') msg(`🛡️ Escudos: +${d.guard}`,'bom');
+      else if(d.kind==='attack') msg(`🥷 Ataque! +${fmt(d.win)} 🪙`,'bom');
+      else if(d.kind==='cat') msg(d.cat ? (d.cat.nova?`🐾 NOVO GATO ${d.cat.e} ${d.cat.nome}!`:`🐾 ${d.cat.nome} repetido +${fmt(d.win)}🪙`) : `🐾 Pegada... ${d.catPity}%`,'bom');
+      else if(d.kind==='raid') msg('🎁 Abre saque no celular!','bom');
+      else msg('😿 Tenta de novo','foi');
+      $('pityTV').textContent='🐾 Próximo gato: '+(d.catPity??0)+'%';
+      $('btnSpin').disabled=false;
+    },380);
+  }).catch(()=>{ clearInterval(t); msg('Sem internet','foi'); $('btnSpin').disabled=false; });
+}
+
+function carregaVilaTV(){
+  if(!userId) return;
+  fetch(API+'/api/gato/village?userId='+userId).then(r=>r.json()).then(d=>{
+    if(d.error) return;
+    const v=d.village;
+    me=d.balance||0;
+    $('coins').textContent=fmt(d.balance);
+    $('vNameTV').textContent=v.name+' · Vila '+v.vid+'/'+v.totalVillages;
+    $('wNameTV').textContent=v.worldEmoji+' '+v.world;
+    $('vlvlTV').textContent=v.level;
+    $('vPosTV').textContent='Progresso lv '+v.level+' · '+v.cats+'/'+v.catTotal+' gatos · '+v.shields+'🛡️';
+    $('unlockTV').textContent=v.unlock?('🔓 Lv '+v.unlock.lvl+': '+v.unlock.txt):'🎉 Nível máximo';
+    $('pityTV').textContent='🐾 Próximo gato: '+Math.round(v.catPity||0)+'%';
+    $('btnDaily').disabled=!v.daily.available;
+    $('btnDaily').textContent=v.daily.available?('🎁 Diária +'+fmt(v.daily.reward)+' ('+v.daily.day+'/'+v.daily.streakMax+')'):'✅ Diária ok';
+    const bb=$('btnBuild');
+    if(v.complete){ bb.disabled=true; bb.textContent='🎉 Vila completa!'; $('btnAdv').disabled=false; $('buildTxt').textContent='Pronta pra avançar!'; }
+    else if(v.next){ bb.disabled=false; bb.textContent='🔨 '+v.next.e+' '+v.next.nome; $('buildTxt').textContent='Nível '+v.next.tier+'/5 · '+fmt(v.next.custo)+' 🪙'; $('btnAdv').disabled=true; }
+    else { bb.disabled=true; bb.textContent='🔨 —'; }
+  }).catch(()=>{});
+}
+
+function diariaTV(){
+  if(!userId) return;
+  post('/api/gato/daily',{userId}).then(d=>{
+    if(d.error) return $('msg').textContent='❌ '+d.error;
+    $('coins').textContent=fmt(d.balance);
+    msg('🎁 +'+fmt(d.reward)+' moedas! Sequência '+d.streak+'/'+d.streakMax,'bom');
+    carregaVilaTV();
+  }).catch(()=>msg('Sem internet','foi'));
+}
+
+function construirTV(){
+  if(!userId) return;
+  post('/api/gato/build',{userId}).then(d=>{
+    if(d.error) return msg('❌ '+d.error,'foi');
+    $('coins').textContent=fmt(d.balance);
+    msg('🏗️ '+d.building.nome+' → Nv '+d.building.tier,'bom');
+    carregaVilaTV();
+  }).catch(()=>msg('Sem internet','foi'));
+}
+
+function avancarTV(){
+  if(!userId) return;
+  post('/api/gato/advance',{userId}).then(d=>{
+    if(d.error) return msg('❌ '+d.error,'foi');
+    $('coins').textContent=fmt(d.balance);
+    msg('🚀 '+d.to.name+'! +'+fmt(d.reward)+' 🪙','bom');
+    carregaVilaTV();
+  }).catch(()=>msg('Sem internet','foi'));
+}
+
+// ---- pareamento (polling em vez de WebSocket: suficiente aqui) ----
+let statusRefr = null;
+async function pollTV(){
+  try{
+    const d = await (await fetch(API+'/api/gato/tv/status?tvId='+encodeURIComponent(tvId))).json();
+    if(d.error) return;
+    $('tvCodeBig').textContent=d.code;
+    $('tvStatus').textContent = d.connected ? '✓ Celular conectado!' : 'Aguardando celular... ('+d.expiraSec+'s)';
+    if(d.connected){
+      if(!userId || d.userId!==userId){
+        userId=d.userId;
+        $('pairView').classList.add('hidden');
+        $('gameView').classList.remove('hidden');
+        msg('📺 Bem-vindo à TV, '+d.userId.slice(0,14)+'!','bom');
+        carregaVilaTV();
+      }
+    } else if(userId){
+      // caiu a conexão — volta pro pareamento
+      userId=null;
+      $('pairView').classList.remove('hidden');
+      $('gameView').classList.add('hidden');
+    }
+  }catch(_){}
+}
+
+// ---- navegação por foco (controle remoto / teclado / mouse) ----
+function focoAtual(){ return document.activeElement && document.activeElement.id; }
+document.addEventListener('keydown', e=>{
+  const at=focoAtual();
+  const ordem=['btnSpin','btnDaily','btnBuild','btnAdv','btnRefresh'];
+  if(e.key==='ArrowDown'||e.key==='ArrowRight'){ e.preventDefault(); moverFoco(+1, ordem, at); }
+  else if(e.key==='ArrowUp'||e.key==='ArrowLeft'){ e.preventDefault(); moverFoco(-1, ordem, at); }
+});
+function moverFoco(dir, ordem, at){
+  let i=ordem.indexOf(at);
+  if(i===-1) i=0;
+  const alvo=ordem[(i+dir+ordem.length)%ordem.length];
+  const el=$(alvo);
+  if(el && el.offsetParent!==null){ el.focus(); }
+}
+
+pollTV();
+statusRefr=setInterval(pollTV, 5000);
+$('btnSpin').onclick=girarTV;
+$('btnDaily').onclick=diariaTV;
+$('btnBuild').onclick=construirTV;
+$('btnAdv').onclick=avancarTV;
+$('btnRefresh').onclick=carregaVilaTV;
+</script>
+</body>
+</html>

@@ -133,6 +133,7 @@ app.get('/cartas', (req, res) => res.sendFile(path.join(__dirname, 'public', 'ca
 app.get('/loteria', (req, res) => res.sendFile(path.join(__dirname, 'public', 'loteria.html')));
 app.get('/turbo', (req, res) => res.sendFile(path.join(__dirname, 'public', 'turbo.html')));
 app.get('/gato', (req, res) => res.sendFile(path.join(__dirname, 'public', 'gato.html')));
+app.get('/gato-tv', (req, res) => res.sendFile(path.join(__dirname, 'public', 'gato-tv.html')));
 app.get('/criador', (req, res) => res.sendFile(path.join(__dirname, 'public', 'criador.html')));
 app.get('/pisstoll', (req, res) => res.sendFile(path.join(__dirname, 'public', 'pisstoll.html')));
 app.get('/divulgar', (req, res) => res.sendFile(path.join(__dirname, 'public', 'divulgar.html')));
@@ -488,6 +489,78 @@ app.get('/api/gato/ranking', async (req, res) => {
   } catch (err) {
     console.error('Erro no ranking do gato:', err.message);
     res.status(500).json({ error: 'Erro no ranking' });
+  }
+});
+
+// ---- Amigos e presentes ----
+app.get('/api/gato/amigos', async (req, res) => {
+  try {
+    const r = await gato.amigosList(db, String(req.query.userId || ''));
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    console.error('Erro nos amigos do gato:', err.message);
+    res.status(500).json({ error: 'Erro nos amigos' });
+  }
+});
+
+app.post('/api/gato/amigos/add', async (req, res) => {
+  try {
+    const { userId, codigo } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
+    const r = await gato.amigoAdd(db, userId, codigo);
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    console.error('Erro ao adicionar amigo:', err.message);
+    res.status(500).json({ error: 'Erro ao adicionar amigo' });
+  }
+});
+
+app.post('/api/gato/amigos/remove', async (req, res) => {
+  try {
+    const { userId, codigo } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
+    const r = await gato.amigoRemove(db, userId, codigo);
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    console.error('Erro ao remover amigo:', err.message);
+    res.status(500).json({ error: 'Erro ao remover amigo' });
+  }
+});
+
+app.post('/api/gato/presente', async (req, res) => {
+  try {
+    const { userId, codigo } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
+    const r = await gato.presente(db, userId, codigo);
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    console.error('Erro no presente do gato:', err.message);
+    res.status(500).json({ error: 'Erro no presente' });
+  }
+});
+
+// ---- Pareamento celular ↔ Smart TV ----
+app.post('/api/gato/tv/register', (req, res) => {
+  const { tvId } = req.body;
+  res.json(gato.tvRegister(tvId));
+});
+app.post('/api/gato/tv/connect', (req, res) => {
+  const { code, userId } = req.body;
+  const r = gato.tvConnect(code, userId);
+  res.status(r.error ? 400 : 200).json(r);
+});
+app.get('/api/gato/tv/status', async (req, res) => {
+  try {
+    const r = await gato.tvStatus(db, String(req.query.tvId || ''));
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    console.error('Erro no status da TV:', err.message);
+    res.status(500).json({ error: 'Erro no status da TV' });
   }
 });
 
