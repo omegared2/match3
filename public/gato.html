@@ -196,6 +196,15 @@
   .aPres.on { background:rgba(255,255,255,.1); color:#86a07f; cursor:default; }
   .aRm { background:rgba(255,90,90,.15); color:#ff9a9a; }
 
+  /* controle remoto da TV */
+  .dpad { display:inline-flex; flex-direction:column; gap:8px; width:min(320px,80vw); background:rgba(255,255,255,.05);
+    border:1px solid rgba(255,255,255,.12); border-radius:20px; padding:14px; margin-bottom:6px; }
+  .dRow { display:flex; justify-content:center; gap:8px; }
+  .dKey { width:84px; height:56px; border:none; border-radius:14px; font-size:22px; font-weight:900; color:#fff;
+    cursor:pointer; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.16); }
+  .dKey.ok { background:linear-gradient(135deg,#ffd968,#ff8a00); color:#3a2400; font-size:18px; width:auto; flex:0 0 96px; }
+  .dKey:active { transform:scale(.94); background:rgba(125,211,252,.4); }
+
   /* modal de saque */
   .modal { position:fixed; inset:0; z-index:60; display:flex; flex-direction:column; justify-content:center; align-items:center;
     background:rgba(6,12,7,.88); backdrop-filter:blur(6px); padding:20px; }
@@ -282,6 +291,18 @@
   <div class="addAm">
     <input id="tvCode" placeholder="Código da TV (6 dígitos)" maxlength="6" autocomplete="off"/>
     <button id="tvConn">📺</button>
+  </div>
+  <div id="ctrlBox" class="hidden">
+    <div class="vsub" style="padding:4px 0 10px">🎛️ Controle da TV <span id="ctrlTv"></span></div>
+    <div class="dpad" style="text-align:center">
+      <button class="dKey" data-k="ArrowUp">▲</button>
+      <div class="dRow">
+        <button class="dKey" data-k="ArrowLeft">◀</button>
+        <button class="dKey ok" data-k="Enter">OK</button>
+        <button class="dKey" data-k="ArrowRight">▶</button>
+      </div>
+      <button class="dKey" data-k="ArrowDown">▼</button>
+    </div>
   </div>
   <div class="rk" id="amigos">
     <div class="vsub" style="padding:20px">Convida um amigo pelo código dele pra se adicionar.<br/>🎁 Presente = 50 moedas, 1× por dia por amigo.<br/>O teu código é: <b style="color:#ffd968" id="meuCodigo"></b></div>
@@ -622,9 +643,36 @@
     if(!code) return toast('Digite o código da TV');
     post('/api/gato/tv/connect',{code,userId}).then(d=>{
       if(d.error){ toast('❌ '+d.error); return; }
+      localStorage.setItem('gato_paired_tv', d.tvId);
+      renderCtrl();
       toast('📺 TV conectada! Abre a TV pra brincar na mesma conta.');
     }).catch(()=>toast('Sem internet'));
   };
+  function renderCtrl(){
+    const t=localStorage.getItem('gato_paired_tv');
+    if(t){ $('ctrlBox').classList.remove('hidden'); $('ctrlTv').textContent='('+t.slice(0,12)+')'; }
+    else $('ctrlBox').classList.add('hidden');
+  }
+  function ctrlEnvia(k){
+    const t=localStorage.getItem('gato_paired_tv');
+    if(!t) return toast('Conecta na TV primeiro');
+    if(!cellWs || cellWs.readyState!==1){ toast('Sem conexão tempo-real'); return; }
+    cellWs.send(JSON.stringify({type:'ctrl', key:k, tvId:t}));
+  }
+  [...document.querySelectorAll('.dKey')].forEach(b=>b.onclick=()=>ctrlEnvia(b.dataset.k));
+
+  // WebSocket do celular (controle remoto da TV, seção 31)
+  let cellWs=null;
+  function abrirCellWS(){
+    const proto = location.protocol==='https:' ? 'wss://' : 'ws://';
+    try { cellWs = new WebSocket(proto + location.host + '/ws?userId=' + encodeURIComponent(userId)); }
+    catch(_) { cellWs=null; }
+    if(!cellWs) return;
+    cellWs.onclose=()=>{ cellWs=null; setTimeout(abrirCellWS, 4000); };
+    cellWs.onerror=()=>{ try{cellWs.close();}catch(_){} };
+  }
+  abrirCellWS();
+  renderCtrl();
 
   fetch(API+'/api/balance/'+userId).then(r=>r.json()).then(d=>setCoins(d.balance)).catch(()=>{});
   status(); setInterval(status,5000);

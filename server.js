@@ -13,6 +13,7 @@ const cartas = require('./cartas');
 const loteria = require('./loteria');
 const turbo = require('./turbo');
 const gato = require('./gato');
+const wscl = require('./wscl');
 const criador = require('./criador');
 
 const app = express();
@@ -480,6 +481,12 @@ app.post('/api/turbo/cashout', async (req, res) => {
   }
 });
 
+// Notifica TVs pareadas após ações que mudam o estado (WebSocket de sessão).
+function pushSinc(userId) {
+  const w = app.get('wsReal');
+  if (w) w.pushSync(userId);
+}
+
 app.get('/api/gato/status', (req, res) => res.json(gato.status()));
 
 app.get('/api/gato/ranking', async (req, res) => {
@@ -536,6 +543,7 @@ app.post('/api/gato/presente', async (req, res) => {
     if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
     const r = await gato.presente(db, userId, codigo);
     if (r.error) return res.status(400).json({ error: r.error });
+    pushSinc(userId);
     res.json(r);
   } catch (err) {
     console.error('Erro no presente do gato:', err.message);
@@ -551,6 +559,7 @@ app.post('/api/gato/tv/register', (req, res) => {
 app.post('/api/gato/tv/connect', (req, res) => {
   const { code, userId } = req.body;
   const r = gato.tvConnect(code, userId);
+  if (!r.error && r.tvId) { const w = app.get('wsReal'); if (w) w.pushPaired(r.tvId, userId); }
   res.status(r.error ? 400 : 200).json(r);
 });
 app.get('/api/gato/tv/status', async (req, res) => {
@@ -581,6 +590,7 @@ app.post('/api/gato/mission-claim', async (req, res) => {
     if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
     const r = await gato.missionClaim(db, userId, id);
     if (r.error) return res.status(400).json({ error: r.error });
+    pushSinc(userId);
     res.json(r);
   } catch (err) {
     console.error('Erro na missão do gato:', err.message);
@@ -605,6 +615,7 @@ app.post('/api/gato/spin', async (req, res) => {
     if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
     const r = await gato.spin(db, userId, nick);
     if (r.error) return res.status(400).json({ error: r.error });
+    pushSinc(userId);
     res.json(r);
   } catch (err) {
     console.error('Erro no gato:', err.message);
@@ -618,6 +629,7 @@ app.post('/api/gato/raid', async (req, res) => {
     if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
     const r = await gato.raid(db, userId, pick);
     if (r.error) return res.status(400).json({ error: r.error });
+    pushSinc(userId);
     res.json(r);
   } catch (err) {
     console.error('Erro no saque do gato:', err.message);
@@ -631,6 +643,7 @@ app.post('/api/gato/build', async (req, res) => {
     if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
     const r = await gato.build(db, userId);
     if (r.error) return res.status(400).json({ error: r.error });
+    pushSinc(userId);
     res.json(r);
   } catch (err) {
     console.error('Erro ao construir vila do gato:', err.message);
@@ -644,6 +657,7 @@ app.post('/api/gato/advance', async (req, res) => {
     if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
     const r = await gato.advance(db, userId);
     if (r.error) return res.status(400).json({ error: r.error });
+    pushSinc(userId);
     res.json(r);
   } catch (err) {
     console.error('Erro ao avançar vila do gato:', err.message);
@@ -657,6 +671,7 @@ app.post('/api/gato/daily', async (req, res) => {
     if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
     const r = await gato.daily(db, userId);
     if (r.error) return res.status(400).json({ error: r.error });
+    pushSinc(userId);
     res.json(r);
   } catch (err) {
     console.error('Erro na diária do gato:', err.message);
@@ -912,7 +927,7 @@ db.initDb().then(() => {
     if (ev === 'winner') notifyTelegram(`🍀 Loteria! Saiu o ${info.num} e ${info.winners} bilhete(s) acertou(aram). Prêmio de ${info.amount} moedas!`);
   };
   turbo.startLoop(db);
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`✅ Servidor rodando em http://localhost:${PORT}`);
     console.log(`   Jogo servido de: ${GAME_DIR}`);
     console.log(`   URL pública (produção): ${process.env.BASE_URL}`);
@@ -922,4 +937,6 @@ db.initDb().then(() => {
       console.log('⚠️  MP_ACCESS_TOKEN não configurado! Edite o arquivo .env');
     }
   });
+  const wsReal = wscl.iniciar(server, db);
+  app.set('wsReal', wsReal);
 });

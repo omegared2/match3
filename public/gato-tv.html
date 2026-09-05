@@ -249,6 +249,39 @@ function moverFoco(dir, ordem, at){
   if(el && el.offsetParent!==null){ el.focus(); }
 }
 
+// ---- WebSocket: pareamento e sessão em tempo real (seção 32) ----
+let wsTV = null;
+function abrirWS(){
+  const proto = location.protocol==='https:' ? 'wss://' : 'ws://';
+  try {
+    wsTV = new WebSocket(proto + location.host + '/ws?tvId=' + encodeURIComponent(tvId));
+  } catch(_) { wsTV = null; }
+  if (!wsTV) return;
+  wsTV.onmessage = ev => {
+    let m;
+    try { m = JSON.parse(ev.data); } catch(_) { return; }
+    if (m.type === 'paired') {
+      // celular pareou → entra no jogo na hora, sem esperar o poll
+      if (userId !== m.userId) {
+        userId = m.userId;
+        $('pairView').classList.add('hidden');
+        $('gameView').classList.remove('hidden');
+        msg('📺 TV conectada à conta '+m.userId.slice(0,14)+'!','bom');
+        carregaVilaTV();
+      }
+    } else if (m.type === 'sync') {
+      // estado mudou no servidor → atualiza sessão
+      carregaVilaTV();
+    } else if (m.type === 'ctrl') {
+      // celular como controle remoto: simula tecla na navegação por foco
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: m.key }));
+    }
+  };
+  wsTV.onclose = () => { wsTV = null; setTimeout(abrirWS, 4000); };
+  wsTV.onerror = () => { try { wsTV.close(); } catch(_) {} };
+}
+abrirWS();
+
 pollTV();
 statusRefr=setInterval(pollTV, 5000);
 $('btnSpin').onclick=girarTV;
