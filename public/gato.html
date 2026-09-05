@@ -39,6 +39,11 @@
   .panel { padding:14px 16px; }
   .hidden { display:none; }
 
+  .netbanner { margin:0 16px 4px; border-radius:14px; padding:10px 14px; font-size:13px; font-weight:800;
+    background:linear-gradient(135deg,#ffecb0,#ffb84d); color:#4a2c00; border:1px solid #ffd968;
+    box-shadow:0 4px 14px rgba(0,0,0,.3); display:flex; align-items:center; gap:8px; }
+  .net-off button { opacity:.65; }
+
   /* máquina */
   .mascote { font-size:76px; line-height:1.05; margin:8px 0 2px; filter:drop-shadow(0 8px 18px rgba(124,212,124,.4)); animation:float 3.2s ease-in-out infinite; }
   @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
@@ -241,6 +246,8 @@
   <button class="tab" id="tabAm">👥 Amigos</button>
 </div>
 
+<div class="netbanner hidden" id="netBanner">🔌 Sem conexão — mostrando os dados salvos. Giro, construção, saque e recompensas exigem o servidor.</div>
+
 <div class="panel" id="panelSlot">
   <div class="evts" id="events"></div>
   <div class="mascote">🐱</div>
@@ -347,6 +354,20 @@
     return fetch(API+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}).then(r=>r.json());
   }
 
+  // ---- tolerância offline (seção 40): visualiza dados salvos, operações exigem servidor ----
+  let online = navigator.onLine !== false;
+  function mudaNet(on){
+    online = !!on;
+    $('netBanner').classList.toggle('hidden', online);
+    document.body.classList.toggle('net-off', !online);
+    bloquear(!online);
+    $('btnDaily').disabled = !online;
+    [...document.querySelectorAll('#missions .claim, #blds button, #amigos button')].forEach(b=>b.disabled=!online);
+  }
+  function semNet(){ toast('🔌 Sem conexão — tenta de novo'); }
+  window.addEventListener('offline',()=>mudaNet(false));
+  window.addEventListener('online',()=>{ mudaNet(true); carregarVila(); status(); });
+
   function celebrate(n){
     for(let i=0;i<14;i++){
       const p=document.createElement('div'); p.className='p';
@@ -364,6 +385,7 @@
   function bloquear(v){ $('btnSpin').disabled=v; }
 
   function girar(){
+    if(!online){ msg('🔌 Sem conexão — tenta de novo','foi'); return; }
     bloquear(true); msg('🎰 Girando...');
     const r0=$('r0'),r1=$('r1'),r2=$('r2');
     const anim = setInterval(()=>{ r0.textContent=SYMS[Math.random()*SYMS.length|0]; r1.textContent=SYMS[Math.random()*SYMS.length|0]; r2.textContent=SYMS[Math.random()*SYMS.length|0]; },70);
@@ -422,6 +444,7 @@
   }
 
   function resgatarMissao(id){
+    if(!online) return semNet();
     post('/api/gato/mission-claim',{userId,id}).then(d=>{
       if(d.error){ toast('❌ '+d.error); return; }
       setCoins(d.balance);
@@ -521,6 +544,7 @@
   function fecharSaque(){ $('raidModal').classList.add('hidden'); raidData=null; }
 
   function escolherBaú(pick){
+    if(!online){ toast('🔌 Sem conexão — tenta de novo'); return; }
     const chests=[...$('chests').children];
     chests.forEach(c=>{ c.classList.add('aberto'); c.onclick=null; });
     chests[pick].textContent='⏳';
@@ -536,6 +560,7 @@
   }
 
   function construir(){
+    if(!online) return semNet();
     post('/api/gato/build',{userId}).then(d=>{
       if(d.error){ toast('❌ '+d.error); return; }
       setCoins(d.balance); village=d; toast('🏠 '+d.building.e+' '+d.building.nome+' → Nv '+d.building.tier+'!');
@@ -544,6 +569,7 @@
   }
 
   function avancar(){
+    if(!online) return semNet();
     post('/api/gato/advance',{userId}).then(d=>{
       if(d.error){ toast('❌ '+d.error); return; }
       setCoins(d.balance); village=d;
@@ -557,10 +583,19 @@
     fetch(API+'/api/gato/village?userId='+userId).then(r=>r.json()).then(d=>{
       if(d.error) return;
       village=d; setCoins(d.balance); renderVila();
-    }).catch(()=>{});
+      try{ localStorage.setItem('gato_cache_'+userId, JSON.stringify({village:d, t:Date.now()})); }catch(e){}
+    }).catch(()=>{
+      if(!village){
+        try{
+          const cache=localStorage.getItem('gato_cache_'+userId);
+          if(cache){ village=JSON.parse(cache).village; setCoins(village.balance); renderVila(); }
+        }catch(e){}
+      }
+    });
   }
 
   function diaria(){
+    if(!online) return semNet();
     post('/api/gato/daily',{userId}).then(d=>{
       if(d.error){ toast('❌ '+d.error); return; }
       setCoins(d.balance); toast('🎁 +'+fmt(d.reward)+' moedas resgatadas!'); celebrate(d.reward);
@@ -570,13 +605,15 @@
 
   function status(){
     fetch(API+'/api/gato/status').then(r=>r.json()).then(d=>{
+      if(!online) mudaNet(true);
       spinCost=d.spinCost; $('custo').textContent=spinCost;
       order=d.buildings||[];
       renderRecent(d.recent||[]);
       $('events').innerHTML=(d.eventos||[]).map(e=>
         '<span class="evt">'+e.e+' '+e.nome+' <span class="de">'+e.txt+' · '+e.dias+'d</span></span>'
       ).join('');
-    }).catch(()=>{});
+      if(online) mudaNet(true);
+    }).catch(()=>{ if(online) mudaNet(false); });
   }
 
   function renderAmigos(){
@@ -600,6 +637,7 @@
   }
 
   function adicionar(){
+    if(!online) return semNet();
     const c=$('amigoCode').value.trim();
     if(!c) return toast('Digite o código do amigo');
     post('/api/gato/amigos/add',{userId,codigo:c}).then(d=>{
@@ -610,6 +648,7 @@
   }
 
   function remover(codigo){
+    if(!online) return semNet();
     post('/api/gato/amigos/remove',{userId,codigo}).then(d=>{
       if(d.error){ toast('❌ '+d.error); return; }
       toast('Amigo removido'); renderAmigos();
@@ -617,6 +656,7 @@
   }
 
   function presentear(codigo){
+    if(!online) return semNet();
     post('/api/gato/presente',{userId,codigo}).then(d=>{
       if(d.error){ toast('❌ '+d.error); return; }
       setCoins(d.balance || $('coins').textContent);
@@ -689,6 +729,7 @@
   }
   abrirCellWS();
   renderCtrl();
+  mudaNet(online);
 
   fetch(API+'/api/balance/'+userId).then(r=>r.json()).then(d=>setCoins(d.balance)).catch(()=>{});
   status(); setInterval(status,5000);
