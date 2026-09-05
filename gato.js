@@ -3,8 +3,10 @@
 //   vila_id = 1..2000 → villaDef(id) gera nome/mundo/tema/custos na hora.
 const CFG = {
   spinCost: Number(process.env.GT_SPIN_COST) || 20,
+  betGrowth: Number(process.env.GT_BET_GROWTH) || 0.025,   // aposta cresce 2,5%/vila (junto do ganho)
+  payoutMult: Number(process.env.GT_PAYOUT_MULT) || 8,      // o giro precisa pagar acima do custo (EV>0)
   dailyReward: Number(process.env.GT_DAILY_REWARD) || 40,
-  villageCostGrowth: Number(process.env.GT_COST_GROWTH) || 0.06,
+  villageCostGrowth: Number(process.env.GT_COST_GROWTH) || 0.03,
   ppPerLevel: Number(process.env.GT_PP_PER_LEVEL) || 250,
   buildingsPerVillage: 5,
   tiers: 5,
@@ -40,11 +42,11 @@ const CFG = {
     { e: '❌', w: 22, kind: 'lose', p2: 0,   p3: 0  }
   ],
   buildings: [
-    { id: 'gato',  nome: 'Casinha do Gato', e: '🏠', custo: 50 },
-    { id: 'peixe', nome: 'Lago de Peixes',  e: '🐟', custo: 120 },
-    { id: 'brin',  nome: 'Arranhador',      e: '🧶', custo: 250 },
-    { id: 'rac',   nome: 'Casa de Ração',   e: '🥣', custo: 500 },
-    { id: 'cast',  nome: 'Castelo do Gato', e: '🏰', custo: 1000 }
+    { id: 'gato',  nome: 'Casinha do Gato', e: '🏠', custo: 10 },
+    { id: 'peixe', nome: 'Lago de Peixes',  e: '🐟', custo: 20 },
+    { id: 'brin',  nome: 'Arranhador',      e: '🧶', custo: 40 },
+    { id: 'rac',   nome: 'Casa de Ração',   e: '🥣', custo: 80 },
+    { id: 'cast',  nome: 'Castelo do Gato', e: '🏰', custo: 160 }
   ],
   worlds: ['Mundo Inicial', 'Floresta', 'Praia', 'Montanhas', 'Cidade', 'Deserto',
            'Neve', 'Espaço', 'Mundo Mágico', 'Submarino', 'Futurista',
@@ -145,6 +147,12 @@ function villaDef(id) {
     id: n, world: CFG.worlds[wIdx], worldEmoji: CFG.worldEmoji[wIdx],
     name: `${CFG.worldEmoji[wIdx]} Vila ${n}`, inWorld, buildings: blds
   };
+}
+
+// aposta da máquina cresce com a vila → giro continua relevante no late game
+function stakePara(vid) {
+  const n = Math.max(1, Math.min(2000, Number(vid) || 1));
+  return Math.round(CFG.spinCost * (1 + (n - 1) * CFG.betGrowth));
 }
 
 function defaultVillage() {
@@ -256,6 +264,13 @@ function villageSnapshot(v) {
   if (day > 1) reward = Math.round(reward * (1 + CFG.streakBase * (day - 1)));
   if (day >= CFG.streakMax) reward = Math.round(reward * CFG.streakFinalMult);
   const nextUnlock = UNLOCKS.find(u => u.lvl > level) || null;
+  // OBJETIVO ATUAL (seção 49 — o jogador sempre sabe "o que faço agora")
+  let faltam = 0;
+  for (const b of CFG.buildings) faltam += CFG.tiers - (built[b.id] || 0);
+  const recompensaAdvance = Math.round(150 * (1 + (v.vid - 1) * CFG.villageCostGrowth));
+  const objetivo = complete
+    ? { type: 'advance', txt: `Avançar para a Vila ${v.vid + 1}`, recompensa: recompensaAdvance }
+    : { type: 'build', txt: 'Complete sua vila', faltam, proxima: next ? next.nome : '', recompensa: recompensaAdvance };
   return {
     vid: v.vid, world: vdef.world, worldEmoji: vdef.worldEmoji, name: vdef.name,
     inWorld: vdef.inWorld, totalVillages: 2000, maxWorlds: CFG.worlds.length,
@@ -266,6 +281,8 @@ function villageSnapshot(v) {
     hasRaid: !!(v.raid && v.raid.exp > Date.now()),
     cats: (v.cats || []).length, catTotal: CATS.length, catBonus: computeBonus(v),
     unlock: nextUnlock ? { lvl: nextUnlock.lvl, txt: nextUnlock.txt } : null,
+    objetivo,
+    mesa: stakePara(v.vid),
     missions: missionsSnapshot(v),
     daily: { reward: avail ? reward : 0, day: avail ? day : streak, streak,
              streakMax: CFG.streakMax, available: avail }
@@ -309,8 +326,8 @@ function computeWin(rollRes, cost) {
     if (groups['🐾'] > 0) return { win: 0, kind: 'cat', single: groups['🐾'] === 1 };
     return { win: 0, kind: 'none' };
   }
-  if (uniform && sym.p3) return { win: Math.floor(cost * sym.p3), kind: 'all', e: sym.e };
-  if (!uniform) return { win: Math.floor(cost * sym.p2), kind: 'pair', e: sym.e };
+  if (uniform && sym.p3) return { win: Math.floor(cost * sym.p3 * CFG.payoutMult), kind: 'all', e: sym.e };
+  if (!uniform) return { win: Math.floor(cost * sym.p2 * CFG.payoutMult), kind: 'pair', e: sym.e };
   return { win: 0, kind: 'none' };
 }
 
@@ -336,16 +353,18 @@ async function collection(db, userId) {
 async function spin(db, userId, nick) {
   if (!userId) return { error: 'userId obrigatório' };
   const user = await db.dbGetUser(userId);
-  if (user.balance < CFG.spinCost) return { error: `Você precisa de ${CFG.spinCost} moedas pra girar` };
-  await db.dbSpendCoins(userId, CFG.spinCost);
+  const char = await db.dbGetCharacter(userId);
+  const vSave = { ...defaultVillage(), ...((char && char.village) || {}) };
+  const mesa = stakePara(vSave.vid);
+  if (user.balance < mesa) return { error: `Você precisa de ${mesa} moedas pra girar` };
+  await db.dbSpendCoins(userId, mesa);
 
   const rollRes = roll();
-  const { win, kind, guard, e } = computeWin(rollRes, CFG.spinCost);
+  const { win, kind, guard, e } = computeWin(rollRes, mesa);
   let credited = null;
-  const out = { ok: true, syms: rollRes.map(s => s.e), kind, e, win: 0, guard: 0, balance: null, defense: null };
+  const out = { ok: true, syms: rollRes.map(s => s.e), kind, e, win: 0, guard: 0, balance: null, defense: null, mesa };
 
-  const char = await db.dbGetCharacter(userId);
-  const v = { ...defaultVillage(), ...((char && char.village) || {}) };
+  const v = vSave;
   const bonus = computeBonus(v);
   let changed = false;
 
@@ -411,8 +430,9 @@ const col = Math.floor((200 + Math.round(100 * (1 + bonus.coins / 100))) * evCoi
     stats.attacks++;
   } else if (kind === 'none' && bonus.luck > 0 && Math.random() < (bonus.luck * 0.006)) {
     // sorte dos gatos mágicos: um consolo cai
-    credited = await db.dbAddCoins(userId, CFG.luckConsolation);
-    out.win = CFG.luckConsolation; out.luck = true;
+    const consolo = Math.round(mesa * 0.5);
+    credited = await db.dbAddCoins(userId, consolo);
+    out.win = consolo; out.luck = true;
   }
 
   // contra-ataque de bot: escudo bloqueia, senão perde pouco
@@ -422,7 +442,7 @@ const col = Math.floor((200 + Math.round(100 * (1 + bonus.coins / 100))) * evCoi
       out.defense = { blocked: true, lost: 0 };
       stats.defenses++;
     } else {
-      const balance = credited ? credited.balance : user.balance - CFG.spinCost;
+      const balance = credited ? credited.balance : user.balance - mesa;
       const lost = Math.min(balance, Math.max(CFG.defenseLossMin, Math.round(balance * CFG.defenseLossPct)));
       if (lost > 0) {
         await db.dbSpendCoins(userId, lost);
@@ -435,7 +455,7 @@ const col = Math.floor((200 + Math.round(100 * (1 + bonus.coins / 100))) * evCoi
   await db.dbSetCharacter(userId, { ...(char || {}), village: v });
 
   stats.spins++;
-  stats.coinsSpent += CFG.spinCost;
+  stats.coinsSpent += mesa;
   stats.coinsWon += out.win;
   playersSet.add(userId);
   stats.players = playersSet.size;
@@ -736,5 +756,6 @@ module.exports = {
   CFG, getConfig, villaDef, collection, spin, raid, build, advance, daily, missionClaim,
   village, ranking, amigosList, amigoAdd, amigoRemove, presente, tvRegister, tvConnect, tvStatus,
   snapshot, status: snapshot, computeWin, dropCat, roll, missionsSnapshot, eventosAtivos,
+  enemyLoot, stakePara,
   GIFT_COST
 };

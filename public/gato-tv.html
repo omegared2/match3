@@ -57,6 +57,9 @@
   .btn2:focus, .foco2 { outline:6px solid #7dd3fc; outline-offset:4px; }
   .meta { font-size:26px; color:#c8e3c0; margin-bottom:8px; }
   .meta b { color:#ffd968; }
+  .objvTV { font-size:22px; line-height:1.5; padding:12px 18px; border-radius:18px; text-align:left;
+    background:linear-gradient(135deg,rgba(255,214,104,.18),rgba(255,138,0,.12)); border:1px solid rgba(255,180,0,.5); margin-bottom:10px; }
+  .objvTV b { color:#ffd968; }
   .sub { font-size:18px; color:#86a07f; min-height:28px; }
   .daily { width:100%; max-width:560px; border:none; border-radius:20px; padding:18px; font-size:24px; font-weight:900; cursor:pointer;
     background:linear-gradient(135deg,#7dd3fc,#38bdf8); color:#04222f; box-shadow:0 10px 26px rgba(56,189,248,.35); }
@@ -101,6 +104,7 @@
       <div class="col">
         <div class="meta" id="vNameTV">— Vilas —</div>
         <div class="meta">🏘️ Nível <b id="vlvlTV">1</b> · <span id="wNameTV">Mundo Inicial</span></div>
+        <div class="objvTV" id="objTV">🎯 ...</div>
         <div class="sub" id="vPosTV"></div>
         <div class="sub" id="unlockTV"></div>
         <div class="pad">
@@ -167,6 +171,13 @@ function carregaVilaTV(){
     $('wNameTV').textContent=v.worldEmoji+' '+v.world;
     $('vlvlTV').textContent=v.level;
     $('vPosTV').textContent='Progresso lv '+v.level+' · '+v.cats+'/'+v.catTotal+' gatos · '+v.shields+'🛡️';
+    const obj=v.objetivo;
+    $('objTV').innerHTML = obj
+      ? (obj.type==='advance'
+          ? '🎯 <b>OBJETIVO:</b> '+obj.txt+' — Recompensa: <b>+'+fmt(obj.recompensa)+' 🪙</b>'
+          : '🎯 <b>OBJETIVO:</b> '+obj.txt+' · faltam <b>'+obj.faltam+'</b> · '+obj.proxima+(v.next?' por <b>'+fmt(v.next.custo)+' 🪙</b>':''))
+      : '';
+    if(v.mesa) $('btnSpin').textContent='🎰 GIRAR · '+v.mesa+' 🪙';
     $('unlockTV').textContent=v.unlock?('🔓 Lv '+v.unlock.lvl+': '+v.unlock.txt):'🎉 Nível máximo';
     $('pityTV').textContent='🐾 Próximo gato: '+Math.round(v.catPity||0)+'%';
     $('btnDaily').disabled=!v.daily.available;
